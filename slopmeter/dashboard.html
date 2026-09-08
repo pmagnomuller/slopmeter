@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Slopmeter — __REPO__</title>
+<link rel="icon" href="__FAVICON__">
+<link rel="apple-touch-icon" href="__FAVICON__">
+<style>
+  :root {
+    --bg: #0b0d0f; --panel: #12151a; --panel-2: #171b21; --border: #23282f; --border-2: #2e353d;
+    --text: #e8ece6; --muted: #8a939d; --faint: #5b6470;
+    --prod: #c9e34a; --test: #8a7ff0; --prod-dim: rgba(201,227,74,.16); --test-dim: rgba(138,127,240,.18);
+    --good: #57c46f; --warn: #e6a23c; --bad: #ef6b6b;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
+    --r: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 13px;
+    -webkit-font-smoothing: antialiased; overflow: hidden;
+  }
+  ::selection { background: var(--prod-dim); }
+  .app { height: 100vh; display: flex; flex-direction: column; }
+  main { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 24px 40px; scroll-behavior: smooth; }
+  .wrap { max-width: 1380px; margin: 0 auto; width: 100%; }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+
+  /* hero */
+  header.hero { padding: 22px 24px 0; }
+  header.hero .wrap { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+  .hero-l { display: flex; gap: 16px; align-items: center; min-width: 0; }
+  .logo { width: 62px; height: 62px; flex-shrink: 0; filter: drop-shadow(0 6px 18px rgba(126,217,87,.25)); }
+  .logo svg { width: 100%; height: 100%; }
+  .eyebrow { font-size: 10.5px; letter-spacing: .22em; color: var(--prod); text-transform: uppercase; display: flex; align-items: center; gap: 12px; }
+  .eyebrow .drag { color: var(--faint); letter-spacing: 0; }
+  .eyebrow .pill { border: 1px solid var(--border); background: var(--panel); border-radius: 8px; padding: 4px 8px; color: var(--muted); letter-spacing: 0; text-transform: none; font-size: 11px; display: inline-flex; gap: 8px; align-items: center; }
+  .eyebrow .pill small { color: var(--faint); font-size: 9px; letter-spacing: .1em; }
+  h1 { font-family: var(--sans); font-size: 24px; font-weight: 600; letter-spacing: -.02em; margin: 6px 0 4px; line-height: 1.1; }
+  .sub { font-family: var(--sans); color: var(--muted); font-size: 13px; margin: 0; }
+  .hero-r { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  .chips { display: flex; gap: 6px; }
+  .chip { border: 1px solid var(--border); background: var(--panel); border-radius: 8px; padding: 4px 9px; font-size: 11.5px; color: var(--text); display: inline-flex; gap: 6px; align-items: center; }
+  .chip .ic { color: var(--muted); }
+  #repo-sel { padding: 4px 26px 4px 9px; font-size: 11.5px; border-radius: 8px; font-weight: 600; max-width: 420px; }
+  .meta { font-size: 11px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .meta b { color: var(--text); font-weight: 600; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--prod); display: inline-block; box-shadow: 0 0 8px var(--prod); }
+
+  /* toolbar */
+  .toolbar { padding: 16px 24px 12px; }
+  .toolbar .wrap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; }
+  .seg button { background: transparent; border: 0; color: var(--muted); font: inherit; font-size: 12px; padding: 7px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: background .12s, color .12s; }
+  .seg button:hover { color: var(--text); }
+  .seg button.on { background: var(--prod-dim); color: var(--prod); font-weight: 600; }
+  .seg.envs button.on { background: color-mix(in srgb, var(--ec) 18%, transparent); color: var(--ec); }
+  .seg.envs button i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; opacity: .8; }
+  .dates { display: inline-flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 3px 8px; color: var(--muted); }
+  .dates input { background: transparent; border: 0; color: var(--text); font: inherit; font-size: 12px; padding: 6px 4px; color-scheme: dark; outline: none; width: 122px; }
+  .dates input:focus { color: var(--prod); }
+  select, .btn { background: var(--panel); border: 1px solid var(--border); color: var(--text); font: inherit; font-size: 12px; border-radius: 10px; padding: 9px 12px; cursor: pointer; }
+  select { appearance: none; -webkit-appearance: none; padding-right: 28px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 15px) 55%, calc(100% - 10px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+  .btn:hover, select:hover { border-color: var(--border-2); }
+  .btn.on { border-color: var(--prod); color: var(--prod); }
+  .btn .k { color: var(--faint); font-size: 10px; margin-left: 6px; border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  .spacer { flex: 1; }
+  .dd { position: relative; }
+  .menu { position: absolute; right: 0; top: calc(100% + 6px); background: var(--panel-2); border: 1px solid var(--border-2); border-radius: 10px; padding: 4px; min-width: 190px; display: none; z-index: 30; box-shadow: 0 14px 40px rgba(0,0,0,.6); }
+  .dd.open .menu { display: block; }
+  .menu button { display: flex; width: 100%; justify-content: space-between; background: transparent; border: 0; color: var(--text); font: inherit; font-size: 12px; padding: 8px 10px; border-radius: 7px; cursor: pointer; text-align: left; }
+  .menu button:hover { background: var(--prod-dim); color: var(--prod); }
+  .menu button span { color: var(--faint); }
+
+  /* cards */
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r); position: relative; }
+  .card-h { display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 18px 0; gap: 12px; }
+  .card-h h2 { margin: 0; font-size: 14px; font-weight: 600; font-family: var(--sans); }
+  .card-h .s { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .card-h .right { color: var(--muted); font-size: 11px; text-align: right; }
+  .card-h .right b { color: var(--text); }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .kpi { padding: 14px 16px 12px; overflow: hidden; min-height: 108px; cursor: default; }
+  .kpi .k { font-size: 10.5px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; display: flex; align-items: center; gap: 7px; }
+  .kpi .k i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .kpi .v { font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin-top: 8px; line-height: 1.05; }
+  .kpi .v small { font-size: 16px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+  .kpi .d { font-size: 11px; color: var(--muted); margin-top: 8px; }
+  .kpi .d b { color: var(--text); font-weight: 500; }
+  .kpi svg.spark { position: absolute; right: 0; bottom: 0; width: 38%; height: 58%; opacity: .85; pointer-events: none; }
+  .kpi .d { position: relative; z-index: 1; }
+
+  /* main chart */
+  .chart-card { padding-bottom: 8px; }
+  .legend { display: flex; gap: 16px; align-items: center; font-size: 11.5px; color: var(--muted); }
+  .legend .it { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .it i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .legend .it b { color: var(--text); font-weight: 600; }
+  .legend .seg { padding: 2px; }
+  .legend .seg button, #rollup button { padding: 4px 9px; font-size: 11px; }
+  #rollup { padding: 2px; }
+  #chart { position: relative; height: 400px; margin-top: 8px; }
+  #chart svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .ax text { fill: var(--muted); font-family: var(--mono); font-size: 10.5px; }
+  .ax .cap { fill: var(--faint); font-size: 9.5px; letter-spacing: .14em; }
+  .grid line { stroke: #1b2027; }
+  .base line { stroke: #2b323b; }
+  .overlay { fill: transparent; cursor: crosshair; }
+  .cross line { stroke: #6b7480; stroke-dasharray: 3 3; }
+  .cross.pinned line { stroke: var(--text); stroke-dasharray: none; }
+  .cap-row { display: flex; justify-content: space-between; padding: 6px 18px 0; font-size: 9.5px; letter-spacing: .14em; color: var(--faint); text-transform: uppercase; }
+  .cap-row .hint kbd { color: var(--muted); font-family: inherit; }
+  .brush-wrap { padding: 10px 18px 6px; }
+  .brush-lbl { display: flex; justify-content: space-between; font-size: 9.5px; letter-spacing: .12em; color: var(--faint); text-transform: uppercase; margin-bottom: 4px; }
+  #brush { position: relative; height: 54px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); overflow: hidden; }
+  #brush svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .brush-sel { position: absolute; top: 0; bottom: 0; background: rgba(201,227,74,.07); border-left: 1px solid rgba(201,227,74,.35); border-right: 1px solid rgba(201,227,74,.35); cursor: grab; }
+  .brush-sel:active { cursor: grabbing; }
+  .handle { position: absolute; top: 8px; bottom: 8px; width: 10px; border-radius: 5px; background: #30363f; border: 1px solid #47505b; cursor: ew-resize; z-index: 2; }
+  .handle::after { content: ""; position: absolute; left: 3.5px; top: 30%; bottom: 30%; width: 1px; background: #8a939d; }
+  .handle:hover { background: #3c4450; }
+
+  .tip { position: fixed; z-index: 40; pointer-events: none; display: none; background: #171b21; border: 1px solid var(--border-2); border-radius: 10px; padding: 10px 12px; font-size: 11.5px; line-height: 1.65; box-shadow: 0 16px 48px rgba(0,0,0,.6); min-width: 190px; }
+  .tip .t { color: var(--text); font-weight: 600; font-size: 12px; margin-bottom: 4px; }
+  .tip .r { display: flex; justify-content: space-between; gap: 18px; color: var(--muted); }
+  .tip .r b { color: var(--text); font-weight: 600; }
+  .tip .r i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+  .tip .f { color: var(--faint); font-size: 10.5px; margin-top: 4px; border-top: 1px solid var(--border); padding-top: 4px; }
+
+  /* lower grids */
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .pad { padding: 14px 18px 16px; }
+  #move { height: 200px; position: relative; margin: 8px 8px 0; }
+  #move svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .rows { display: flex; flex-direction: column; gap: 5px; }
+  .row { display: grid; grid-template-columns: minmax(120px, 34%) 1fr auto; gap: 12px; align-items: center; padding: 5px 8px; margin: 0 -8px; border-radius: 8px; cursor: pointer; transition: background .1s; }
+  .row:hover { background: var(--panel-2); }
+  .row.on { background: var(--prod-dim); }
+  .row .n { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row.on .n { color: var(--prod); }
+  .row .bar { height: 7px; display: flex; gap: 2px; }
+  .row .bar i { display: block; height: 100%; border-radius: 3px; min-width: 0; }
+  .row .bar i.p { background: var(--prod); } .row .bar i.t { background: var(--test); } .row .bar i.b { background: #6b7480; }
+  .row .bar.div { position: relative; }
+  .row .bar.div i { position: absolute; top: 0; }
+  .row .bar.div .mid { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--border-2); }
+  .row .val { font-size: 11.5px; color: var(--text); text-align: right; white-space: nowrap; }
+  .row .val.neg { color: var(--muted); }
+  .row .val small { color: var(--faint); margin-left: 6px; }
+  .empty { color: var(--faint); font-size: 11.5px; padding: 12px 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; position: sticky; top: 0; background: var(--panel); }
+  th:first-child, td:first-child { text-align: left; }
+  td.mut { color: var(--muted); }
+  .tbl-wrap { max-height: 420px; overflow: auto; margin: 10px 0 0; border: 1px solid var(--border); border-radius: 8px; }
+  .hidden { display: none !important; }
+
+  /* fleet */
+  #fleet-card .tbl-wrap { max-height: none; }
+  #fleet th { cursor: pointer; user-select: none; }
+  #fleet th.on { color: var(--prod); }
+  #fleet td { padding: 8px 10px; }
+  #fleet tr.r { cursor: pointer; }
+  #fleet tr.r:hover td { background: var(--panel-2); }
+  #fleet .stack { display: flex; gap: 2px; height: 7px; width: 140px; }
+  #fleet .stack i { display: block; height: 100%; border-radius: 3px; }
+  #fleet .stack i.p { background: var(--prod); } #fleet .stack i.t { background: var(--test); }
+  #fleet svg { width: 110px; height: 26px; display: block; }
+  #fleet .repo { text-align: left; font-weight: 600; color: var(--text); }
+  #fleet .repo small { display: block; color: var(--faint); font-weight: 400; font-size: 10px; margin-top: 2px; }
+  .badge { display: inline-block; font-size: 9.5px; letter-spacing: .06em; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border-2); color: var(--muted); text-transform: uppercase; }
+  .badge.ai { color: #d7a6ff; border-color: rgba(215,166,255,.4); }
+  .badge.good { color: var(--good); border-color: rgba(87,196,111,.4); } .badge.warn { color: var(--warn); border-color: rgba(230,162,60,.4); } .badge.bad { color: var(--bad); border-color: rgba(239,107,107,.4); }
+  .fleet-sum { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .fleet-sum .kpi { min-height: 84px; }
+  .fleet-sum .kpi .v { font-size: 24px; }
+  /* PR panel */
+  #prs { margin: 8px 18px 6px; border-top: 1px solid var(--border); padding-top: 10px; }
+  #prs .h { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+  #prs .h b { color: var(--text); }
+  .pr { display: grid; grid-template-columns: 60px 1fr auto auto; gap: 10px; align-items: center; padding: 4px 8px; margin: 0 -8px; border-radius: 6px; font-size: 11.5px; text-decoration: none; color: var(--text); }
+  .pr:hover { background: var(--panel-2); }
+  .pr .n { color: var(--muted); } .pr .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .pr .a { color: var(--muted); } .pr .d { color: var(--muted); min-width: 60px; text-align: right; }
+  .pr .d.pos { color: var(--text); }
+  body.fleet .hero-r .chip, body.fleet .hero-r .meta, body.fleet .dates, body.fleet #envs, body.fleet #ranges, body.fleet #metric, body.fleet #btn-table, body.fleet #btn-export { display: none !important; }
+  footer.foot { color: var(--faint); font-size: 11px; line-height: 1.7; padding: 8px 4px 0; }
+  footer.foot b { color: var(--muted); font-weight: 500; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translate(-50%, 20px); background: var(--panel-2); border: 1px solid var(--border-2); border-radius: 10px; padding: 9px 14px; font-size: 12px; opacity: 0; transition: all .2s; pointer-events: none; z-index: 50; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 1100px) { .kpis { grid-template-columns: 1fr 1fr; } .g3 { grid-template-columns: 1fr; } }
+  @media (max-width: 820px) { .g2 { grid-template-columns: 1fr; } .hero-r { display: none; } #chart { height: 300px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hero"><div class="wrap">
+    <div class="hero-l">
+      <div class="logo">__ICON__</div>
+      <div>
+        <div class="eyebrow">Slopmeter &nbsp;·&nbsp; Codebase observatory <span class="pill"><span class="drag">⠿</span> Slopmeter <small>HTML</small></span></div>
+        <h1>Every line tells a story.</h1>
+        <p class="sub">Production meets tests. Watch the balance evolve.</p>
+      </div>
+    </div>
+    <div class="hero-r">
+      <div class="chips"><span class="chip" id="repo-chip"><span class="ic">⌂</span><b id="repo-name"></b></span><select id="repo-sel" class="hidden" title="Switch repository"></select><span class="chip"><span class="ic">⑂</span><span id="branch-name"></span></span></div>
+      <div class="meta"><span class="dot"></span> Snapshot · <span id="snap-date"></span></div>
+      <div class="meta" id="hist-days"></div>
+      <div class="meta">slop score <b id="slop-score"></b> <span id="slop-hint" style="color:var(--faint)"></span> <span id="ai-share" style="margin-left:8px"></span></div>
+      <div class="meta hidden" id="drift"></div>
+    </div>
+  </div></header>
+
+  <div class="toolbar"><div class="wrap">
+    <div class="seg envs" id="envs"></div>
+    <div class="seg" id="ranges"></div>
+    <div class="dates"><input type="date" id="from"> <span>→</span> <input type="date" id="to"></div>
+    <select id="metric" title="Metric">
+      <option value="nb">Nonblank LOC</option>
+      <option value="all">All lines</option>
+      <option value="files">Files</option>
+      <option value="bytes">Bytes</option>
+    </select>
+    <div class="spacer"></div>
+    <button class="btn hidden" id="btn-fleet" title="Fleet overview of all repos (G)">Fleet<span class="k">G</span></button>
+    <button class="btn" id="btn-table" title="Toggle data table (T)">Table<span class="k">T</span></button>
+    <div class="dd" id="dd">
+      <button class="btn" id="btn-export">⤓ Export ▾</button>
+      <div class="menu">
+        <button data-x="csv">Visible range as CSV <span>.csv</span></button>
+        <button data-x="json">Full dataset as JSON <span>.json</span></button>
+        <button data-x="svg">Main chart as SVG <span>.svg</span></button>
+        <button data-x="link">Copy link to this view <span>#</span></button>
+      </div>
+    </div>
+    <button class="btn" id="btn-fs" title="Fullscreen (F)">⛶</button>
+  </div></div>
+
+  <main><div class="wrap stack">
+    <div id="fleet-view" class="stack hidden">
+      <section class="fleet-sum" id="fleet-sum"></section>
+      <section class="card" id="fleet-card">
+        <div class="card-h"><div><h2>Fleet overview</h2><div class="s" id="fleet-sub"></div></div><div class="right">click a column to sort · click a row to open</div></div>
+        <div class="pad"><div class="tbl-wrap"><table id="fleet"></table></div></div>
+      </section>
+    </div>
+    <div id="repo-view" class="stack">
+    <section class="kpis">
+      <div class="card kpi" id="kpi-prod"><div class="k"><i style="background:var(--prod)"></i><span>Production LOC</span></div><div class="v" style="color:var(--prod)"></div><div class="d"></div><svg class="spark"></svg></div>
+      <div class="card kpi" id="kpi-test"><div class="k"><i style="background:var(--test)"></i><span>Test LOC</span></div><div class="v" style="color:var(--test)"></div><div class="d"></div><svg class="spark"></svg></div>
+      <div class="card kpi" id="kpi-ratio"><div class="k"><span>Test / production</span></div><div class="v"></div><div class="d"></div><svg class="spark"></svg></div>
+      <div class="card kpi" id="kpi-net"><div class="k"><span>Net change · selected range</span></div><div class="v"></div><div class="d"></div><svg class="spark"></svg></div>
+    </section>
+
+    <section class="card chart-card">
+      <div class="card-h">
+        <div><h2 id="chart-title">Production &amp; test LOC over time</h2><div class="s" id="chart-sub"></div></div>
+        <div class="legend">
+          <span class="it"><i style="background:var(--prod)"></i>Production <b id="lg-prod"></b></span>
+          <span class="it"><i style="background:var(--test)"></i>Tests <b id="lg-test"></b></span>
+          <div class="seg" id="mode"><button data-m="loc">LOC</button><button data-m="delta">Δ from start</button><button data-m="ratio">ratio</button></div>
+        </div>
+      </div>
+      <div id="chart"></div>
+      <div class="cap-row"><span id="cap-left">Nonblank source lines · comments included · latest day partial</span><span class="hint"><span id="mark-hint"></span><span id="repo-hint"></span>Hover to inspect · click to pin · <kbd>←</kbd> <kbd>→</kbd> to explore · <kbd>esc</kbd> unpin</span></div>
+      <div id="prs" class="hidden"></div>
+      <div class="brush-wrap">
+        <div class="brush-lbl"><span id="br-l"></span><span>Drag handles to explore history</span><span id="br-r"></span></div>
+        <div id="brush"><svg></svg><div class="brush-sel" id="bsel"></div><div class="handle" id="h0"></div><div class="handle" id="h1"></div></div>
+      </div>
+    </section>
+
+    <section class="g2">
+      <div class="card">
+        <div class="card-h"><div><h2>Daily net movement</h2><div class="s" id="move-sub">Two bars per day · additions minus removals</div></div><div class="right" id="move-total"></div></div>
+        <div id="move"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><div><h2>Where the lines live</h2><div class="s" id="live-sub"></div></div><div class="right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><div class="seg" id="rollup"><button data-r="0">detailed</button><button data-r="1">top-level</button></div><span id="live-hint" style="color:var(--faint)">click a row to focus it</span></div></div>
+        <div class="pad rows" id="live"></div>
+      </div>
+    </section>
+
+    <section class="g3">
+      <div class="card">
+        <div class="card-h"><div><h2>Language mix</h2><div class="s" id="lang-sub"></div></div><div class="right">prod / test</div></div>
+        <div class="pad rows" id="langs"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><div><h2>Who wrote it</h2><div class="s" id="auth-sub"></div></div><div class="right">lines added · prod / test</div></div>
+        <div class="pad rows" id="authors"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><div><h2>Top movers</h2><div class="s" id="mov-sub"></div></div><div class="right">net lines in range</div></div>
+        <div class="pad rows" id="movers"></div>
+      </div>
+    </section>
+
+    <section class="card hidden" id="table-card">
+      <div class="card-h"><div><h2>Daily snapshots</h2><div class="s" id="tbl-sub"></div></div><div class="right">newest first</div></div>
+      <div class="pad"><div class="tbl-wrap"><table id="tbl"></table></div></div>
+    </section>
+
+    </div>
+    <footer class="foot">
+      <b>How it counts.</b> One snapshot per UTC day: the last first-parent commit on the branch that day. Every file in that tree is classified as
+      <b>production</b> (source code: .go .py .ts .sql .sh .tf …), <b>test</b> (tests/ dirs, _test.go, test_*.py, .spec/.test, .feature, mocks &amp; fixtures) or ignored
+      (docs, config, JSON/YAML, lockfiles, vendored, generated). Lines are counted exactly from the blob — nonblank means whitespace-only lines are dropped, comments stay.
+      Daily movement uses <code>git log --numstat --first-parent</code>, so a merged PR lands as one day's change. The <b>slop score</b> is the attention-gap model:
+      weighted lines added vs. human commit budget + test lines written; lower is better.
+    </footer>
+  </div></main>
+</div>
+<div class="tip" id="tip"></div>
+<div class="toast" id="toast"></div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+(function () {
+  "use strict";
+  var D = JSON.parse(document.getElementById("data").textContent);
+  var $ = function (id) { return document.getElementById(id); };
+  var DAY = 86400000;
+  var C = { prod: "#c9e34a", test: "#8a7ff0" };
+  var ENVC = { dev: "#58a6ff", stg: "#e6a23c", staging: "#e6a23c", prd: "#57c46f", prod: "#57c46f" };
+  function envColor(id) { return ENVC[id] || "#8a939d"; }
+  function isTags(e) { return e.kind === "tags"; }
+  function snapWord(e, n) { return isTags(e) ? (n === 1 ? "deploy" : "deploys") : (n === 1 ? "snapshot day" : "snapshot days"); }
+  var METRIC = {
+    nb:    { p: "p",  t: "t",  label: "LOC",   unit: "lines", cap: "Nonblank source lines · comments included · latest day partial" },
+    all:   { p: "pa", t: "ta", label: "lines", unit: "lines", cap: "All lines including blank · latest day partial" },
+    files: { p: "pf", t: "tf", label: "files", unit: "files", cap: "File count per class · latest day partial" },
+    bytes: { p: "pb", t: "tb", label: "bytes", unit: "bytes", cap: "Blob size in bytes · latest day partial" }
+  };
+  var RANGES = [{ l: "7 days", d: 7 }, { l: "30 days", d: 30 }, { l: "90 days", d: 90 }, { l: "180 days", d: 180 }, { l: "All time", d: 0 }];
+
+  var state = { view: D.repos.length > 1 ? "fleet" : "repo", repo: D.active, env: null, days: D.defaultDays || 30, from: null, to: null, metric: "nb", mode: "loc", pin: null, group: null, table: false, rollup: false };
+  readHash();
+
+  /* ---------- utils ---------- */
+  function ts(iso) { return Date.parse(iso + "T00:00:00Z"); }
+  function iso(t) { return new Date(t).toISOString().slice(0, 10); }
+  function fmt(n) { return Math.round(n).toLocaleString("en-US"); }
+  function sgn(n) { return (n > 0 ? "+" : n < 0 ? "−" : "") + fmt(Math.abs(n)); }
+  function short(n) {
+    var a = Math.abs(n), s = n < 0 ? "−" : n > 0 ? "+" : "";
+    if (a >= 1e6) return s + (a / 1e6).toFixed(2) + "m";
+    if (a >= 1e4) return s + (a / 1e3).toFixed(0) + "k";
+    if (a >= 1e3) return s + (a / 1e3).toFixed(1) + "k";
+    return s + fmt(a);
+  }
+  function shortAbs(n) { return short(Math.abs(n)).replace(/^[+−]/, ""); }
+  var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function fmtD(isoS, year) { var p = isoS.split("-"); return MON[+p[1] - 1] + " " + (+p[2]) + (year ? ", " + p[0] : ""); }
+  function fmtDD(isoS) { var p = isoS.split("-"); return p[2] + " " + MON[+p[1] - 1] + " " + p[0]; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function niceCeil(v) { if (v <= 0) return 1; var m = Math.pow(10, Math.floor(Math.log10(v))), f = v / m; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * m; }
+  function ratio(p, t) { return p ? t / p : 0; }
+  function el(tag, attrs, html) { var e = document.createElement(tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (html != null) e.innerHTML = html; return e; }
+  function toast(msg) { var t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.tm); toast.tm = setTimeout(function () { t.classList.remove("show"); }, 1800); }
+
+  /* ---------- state <-> hash ---------- */
+  function readHash() {
+    var h = location.hash.replace(/^#/, "");
+    if (!h) return;
+    h.split("&").forEach(function (kv) {
+      var p = kv.split("="), k = p[0], v = decodeURIComponent(p[1] || "");
+      if (k === "view") state.view = v;
+      else if (k === "repo") state.repo = v;
+      else if (k === "env") state.env = v;
+      else if (k === "days") { state.days = +v; state.from = state.to = null; }
+      else if (k === "from") { state.from = v; state.days = null; }
+      else if (k === "to") { state.to = v; state.days = null; }
+      else if (k === "metric" && METRIC[v]) state.metric = v;
+      else if (k === "mode") state.mode = v;
+      else if (k === "pin") state.pin = v;
+      else if (k === "group") state.group = v;
+      else if (k === "table") state.table = v === "1";
+      else if (k === "rollup") state.rollup = v === "1";
+    });
+  }
+  function writeHash() {
+    var parts = [];
+    if (D.repos.length > 1) parts.push("view=" + state.view);
+    parts.push("repo=" + encodeURIComponent(state.repo), "env=" + state.env);
+    if (state.days != null) parts.push("days=" + state.days); else parts.push("from=" + state.from, "to=" + state.to);
+    if (state.metric !== "nb") parts.push("metric=" + state.metric);
+    if (state.mode !== "loc") parts.push("mode=" + state.mode);
+    if (state.pin) parts.push("pin=" + state.pin);
+    if (state.group) parts.push("group=" + encodeURIComponent(state.group));
+    if (state.table) parts.push("table=1");
+    if (state.rollup) parts.push("rollup=1");
+    history.replaceState(null, "", "#" + parts.join("&"));
+  }
+
+  /* ---------- data model ---------- */
+  var cache = {};
+  function repo() { return D.repos.filter(function (r) { return r.slug === state.repo; })[0] || D.repos[0]; }
+  function envs() { return repo().envs; }
+  function env() { return envs().filter(function (e) { return e.id === state.env; })[0] || envs()[0]; }
+  function dense() {
+    var e = env(), key = repo().slug + "\u0000" + e.id;
+    if (cache[key]) return cache[key];
+    var snaps = e.snaps, out = [], j = 0;
+    expandDeltas(snaps);
+    var t0 = ts(snaps[0].d), t1 = ts(snaps[snaps.length - 1].d);
+    var moves = {}; e.moves.forEach(function (m) { moves[m.d] = m; });
+    for (var t = t0; t <= t1; t += DAY) {
+      var d = iso(t);
+      while (j + 1 < snaps.length && ts(snaps[j + 1].d) <= t) j++;
+      var real = snaps[j].d === d;
+      out.push({ d: d, t: t, real: real, s: snaps[j], m: moves[d] || null, i: out.length });
+    }
+    cache[key] = out;
+    return out;
+  }
+  function groupsOf(g, n) {
+    // Collapse detailed groups to their top-level directory when rolled up.
+    if (!state.rollup) return g;
+    var out = {};
+    for (var k in g) { var top = k.split("/")[0], r = g[k], o = out[top] || (out[top] = r.map(function () { return 0; })); for (var i = 0; i < r.length; i++) o[i] += r[i]; }
+    return out;
+  }
+  function expandDeltas(snaps) {
+    // `g` and `l` are delta-encoded per day (changed keys only, null = removed).
+    if (snaps._x) return;
+    ["g", "l"].forEach(function (key) {
+      var prev = {};
+      snaps.forEach(function (sn) {
+        var full = {}, k;
+        for (k in prev) full[k] = prev[k];
+        for (k in sn[key]) { if (sn[key][k] === null) delete full[k]; else full[k] = sn[key][k]; }
+        sn[key] = full; prev = full;
+      });
+    });
+    snaps._x = true;
+  }
+  function val(day, cls) {
+    var s = day.s, M = METRIC[state.metric];
+    if (state.group) {
+      var g = groupsOf(s.g)[state.group] || [0, 0, 0, 0];
+      if (state.metric === "files") return cls === "p" ? g[2] : g[3];
+      return cls === "p" ? g[0] : g[1];
+    }
+    return s[M[cls]];
+  }
+  function range() {
+    var all = dense(), last = all[all.length - 1].t, first = all[0].t;
+    var to = state.to ? Math.min(last, Math.max(first, ts(state.to))) : last;
+    var from;
+    if (state.days != null) from = state.days ? to - (state.days - 1) * DAY : first;
+    else from = state.from ? Math.max(first, Math.min(to, ts(state.from))) : first;
+    from = Math.max(first, from);
+    return [from, to];
+  }
+  function visible() { var r = range(); return dense().filter(function (x) { return x.t >= r[0] && x.t <= r[1]; }); }
+
+  /* ---------- controls ---------- */
+  function buildEnvs() {
+    var box = $("envs"); box.innerHTML = "";
+    box.classList.toggle("hidden", envs().length < 2);
+    if (envs().length < 2) return;
+    envs().forEach(function (e) {
+      var b = el("button", { title: (isTags(e) ? "deploys from " : "branch: ") + e.branch + " · " + e.snaps.length + " " + snapWord(e, e.snaps.length) }, "<i></i>" + esc(e.id));
+      b.style.setProperty("--ec", envColor(e.id));
+      if (e.id === state.env) b.className = "on";
+      b.onclick = function () { state.env = e.id; state.pin = null; state.group = null; buildEnvs(); render(); };
+      box.appendChild(b);
+    });
+  }
+  function buildRanges() {
+    var box = $("ranges"); box.innerHTML = "";
+    RANGES.forEach(function (r, i) {
+      var b = el("button", { title: "key " + (i + 1) }, r.l);
+      if (state.days === r.d) b.className = "on";
+      b.onclick = function () { setDays(r.d); };
+      box.appendChild(b);
+    });
+  }
+  function setDays(d) { state.days = d; state.from = state.to = null; state.pin = null; buildRanges(); render(); }
+  function syncDates() {
+    var r = range(), all = dense();
+    $("from").value = iso(r[0]); $("to").value = iso(r[1]);
+    $("from").min = $("to").min = all[0].d; $("from").max = $("to").max = all[all.length - 1].d;
+  }
+  $("from").onchange = $("to").onchange = function () {
+    var f = $("from").value, t = $("to").value;
+    if (!f || !t) return;
+    if (ts(f) > ts(t)) { var x = f; f = t; t = x; }
+    state.from = f; state.to = t; state.days = null; state.pin = null; buildRanges(); render();
+  };
+  $("metric").value = state.metric;
+  $("metric").onchange = function () { state.metric = this.value; render(); };
+  Array.prototype.forEach.call($("mode").children, function (b) {
+    b.onclick = function () { state.mode = b.getAttribute("data-m"); render(); };
+  });
+  Array.prototype.forEach.call($("rollup").children, function (b) {
+    b.onclick = function () { state.rollup = b.getAttribute("data-r") === "1"; state.group = null; render(); };
+  });
+  $("btn-fleet").onclick = function () { state.view = state.view === "fleet" ? "repo" : "fleet"; render(); };
+  function openRepo(slug) { state.view = "repo"; state.repo = slug; state.env = null; state.pin = null; state.group = null; buildRepos(); buildEnvs(); render(); $("main-top") && $("main-top").scrollIntoView(); }
+  $("btn-table").onclick = function () { state.table = !state.table; render(); if (state.table) $("table-card").scrollIntoView({ behavior: "smooth" }); };
+  $("btn-fs").onclick = toggleFs;
+  function toggleFs() { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }
+  $("btn-export").onclick = function (e) { e.stopPropagation(); $("dd").classList.toggle("open"); };
+  document.addEventListener("click", function () { $("dd").classList.remove("open"); });
+  Array.prototype.forEach.call(document.querySelectorAll(".menu button"), function (b) {
+    b.onclick = function (e) { e.stopPropagation(); $("dd").classList.remove("open"); doExport(b.getAttribute("data-x")); };
+  });
+
+  function download(name, mime, text) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  function doExport(kind) {
+    var e = env(), slug = repo().slug.replace(/[^a-z0-9]+/gi, "-");
+    if (kind === "csv") {
+      var rows = [["date", "snapshot", "sha", "prod_loc", "test_loc", "test_per_prod", "prod_all_lines", "test_all_lines", "prod_files", "test_files", "prod_added", "prod_removed", "test_added", "test_removed", "commits", "bot_commits"]];
+      visible().forEach(function (x) {
+        var m = x.m || {};
+        rows.push([x.d, x.real ? 1 : 0, x.s.sha, x.s.p, x.s.t, ratio(x.s.p, x.s.t).toFixed(4), x.s.pa, x.s.ta, x.s.pf, x.s.tf, m.pa || 0, m.pd || 0, m.ta || 0, m.td || 0, m.c || 0, m.bc || 0]);
+      });
+      download("slopmeter-" + slug + "-" + e.id + ".csv", "text/csv", rows.map(function (r) { return r.join(","); }).join("\n"));
+    } else if (kind === "json") {
+      download("slopmeter-" + slug + ".json", "application/json", JSON.stringify(D));
+    } else if (kind === "svg") {
+      var svg = $("chart").querySelector("svg").cloneNode(true);
+      svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      svg.querySelectorAll(".cross, .overlay").forEach(function (n) { n.remove(); });
+      var css = "text{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;fill:#8a939d}.cap{fill:#5b6470;font-size:9.5px;letter-spacing:.14em}.grid line{stroke:#1b2027}.base line{stroke:#2b323b}.lbl{fill:#e8ece6;font-weight:600}";
+      svg.insertBefore(el("style", {}, css), svg.firstChild);
+      svg.insertBefore(el("rect", { width: "100%", height: "100%", fill: "#12151a" }), svg.firstChild);
+      download("slopmeter-" + slug + "-chart.svg", "image/svg+xml", svg.outerHTML);
+    } else if (kind === "link") {
+      writeHash();
+      var url = location.href;
+      (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () { toast("Link copied"); }, function () { prompt("Copy link", url); });
+    }
+  }
+
+  /* ---------- keyboard ---------- */
+  document.addEventListener("keydown", function (e) {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    var k = e.key;
+    if (k >= "1" && k <= "5") { setDays(RANGES[+k - 1].d); }
+    else if (k === "f" || k === "F") toggleFs();
+    else if ((k === "g" || k === "G") && D.repos.length > 1) $("btn-fleet").click();
+    else if (k === "t" || k === "T") $("btn-table").click();
+    else if (k === "Escape") { state.pin = null; state.group = null; render(); }
+    else if (k === "ArrowLeft" || k === "ArrowRight") {
+      var vis = visible(), idx = -1;
+      if (state.pin) vis.forEach(function (x, i) { if (x.d === state.pin) idx = i; });
+      if (idx < 0) idx = vis.length - 1;
+      idx = Math.max(0, Math.min(vis.length - 1, idx + (k === "ArrowLeft" ? -1 : 1)));
+      if (e.shiftKey) { while (idx > 0 && idx < vis.length - 1 && !vis[idx].real) idx += (k === "ArrowLeft" ? -1 : 1); }
+      state.pin = vis[idx].d; render(); e.preventDefault();
+    }
+  });
+
+  /* ---------- tooltip ---------- */
+  var tip = $("tip");
+  function showTip(html, x, y) {
+    tip.innerHTML = html; tip.style.display = "block";
+    var w = tip.offsetWidth, h = tip.offsetHeight;
+    var lx = x + 16, ly = y - 12;
+    if (lx + w > window.innerWidth - 12) lx = x - w - 16;
+    if (ly + h > window.innerHeight - 12) ly = window.innerHeight - h - 12;
+    tip.style.left = Math.max(8, lx) + "px"; tip.style.top = Math.max(8, ly) + "px";
+  }
+  function hideTip() { tip.style.display = "none"; }
+  function dayTip(x, first) {
+    var p = val(x, "p"), t = val(x, "t"), M = METRIC[state.metric];
+    var e = env();
+    var h = "<div class='t'>" + fmtD(x.d, true) + (x.real ? (x.s.tag ? " <span style='color:" + envColor(e.id) + ";font-weight:400'>· " + esc(x.s.tag) + "</span>" : "") : " <span style='color:var(--faint);font-weight:400'>· " + (isTags(e) ? "no deploy, carried" : "no commits, carried") + "</span>") + "</div>";
+    h += "<div class='r'><span><i style='background:" + C.prod + "'></i>Production</span><b>" + fmt(p) + "</b></div>";
+    h += "<div class='r'><span><i style='background:" + C.test + "'></i>Tests</span><b>" + fmt(t) + "</b></div>";
+    h += "<div class='r'><span>Test / prod</span><b>" + ratio(p, t).toFixed(2) + "×</b></div>";
+    if (first && first !== x) h += "<div class='r'><span>Δ since " + fmtD(first.d) + "</span><b>" + sgn(p - val(first, "p")) + " / " + sgn(t - val(first, "t")) + "</b></div>";
+    if (x.m) h += "<div class='r'><span>" + (isTags(e) ? "In this deploy" : "That day") + "</span><b>" + x.m.c + " commit" + (x.m.c === 1 ? "" : "s") + (x.m.ai ? " · " + x.m.ai + " AI" : "") + (x.m.bc ? " · " + x.m.bc + " bot" : "") + "</b></div>";
+    var prs = prsFor(x); if (prs.length) h += "<div class='r'><span>Merged PRs</span><b>" + prs.length + (state.pin === x.d ? "" : " · click to list") + "</b></div>";
+    if (x.s.ab) h += "<div class='r'><span>vs " + esc(repo().trunk || "trunk") + "</span><b>" + x.s.ab[0] + " ahead · " + x.s.ab[1] + " behind</b></div>";
+    h += "<div class='f'>" + x.s.sha + (isTags(e) ? " · tagged deploy" : " · UTC daily snapshot") + (state.group ? " · " + esc(state.group) : "") + " · " + M.unit + "</div>";
+    return h;
+  }
+
+  /* ---------- render ---------- */
+  function render() {
+    if (!envs().filter(function (x) { return x.id === state.env; }).length) { state.env = repo().active; buildEnvs(); }
+    writeHash();
+    var fleet = state.view === "fleet" && D.repos.length > 1;
+    $("btn-fleet").classList.toggle("hidden", D.repos.length < 2);
+    $("btn-fleet").className = "btn" + (fleet ? " on" : "") + (D.repos.length < 2 ? " hidden" : "");
+    document.body.classList.toggle("fleet", fleet);
+    $("fleet-view").classList.toggle("hidden", !fleet);
+    $("repo-view").classList.toggle("hidden", fleet);
+    if (fleet) { drawFleet(); return; }
+    var e = env(), all = dense(), vis = visible(), M = METRIC[state.metric];
+    if (state.group && state.metric !== "nb" && state.metric !== "files") { state.metric = "nb"; $("metric").value = "nb"; M = METRIC.nb; }
+    if (!vis.length) return;
+    var first = vis[0], last = vis[vis.length - 1], head = all[all.length - 1];
+    var realCount = vis.filter(function (x) { return x.real; }).length;
+    syncDates();
+    Array.prototype.forEach.call($("mode").children, function (b) { b.className = b.getAttribute("data-m") === state.mode ? "on" : ""; });
+    $("btn-table").className = "btn" + (state.table ? " on" : "");
+    $("table-card").classList.toggle("hidden", !state.table);
+
+    // hero meta
+    $("branch-name").textContent = e.branch;
+    var gen = D.generated ? new Date(D.generated) : null;
+    $("snap-date").textContent = fmtDD(head.d) + (gen ? " · built " + gen.toISOString().slice(11, 16) + " UTC" : "");
+    var histDays = Math.round((head.t - all[0].t) / DAY) + 1;
+    $("hist-days").textContent = fmt(histDays) + " days of " + (isTags(e) ? e.id + " deploy history · " + fmt(e.snaps.length) + " deploys" : "repository history · " + fmt(e.commits) + " commits");
+    var sl = e.slop.latest;
+    if (e.slop.ok === false) {
+      $("slop-score").textContent = "n/a"; $("slop-score").style.color = "var(--muted)";
+      $("slop-hint").textContent = "insufficient history";
+    } else {
+      $("slop-score").textContent = (sl * 100).toFixed(0) + "%";
+      $("slop-score").style.color = sl < 0.15 ? "var(--good)" : sl < 0.4 ? "var(--warn)" : "var(--bad)";
+      $("slop-hint").textContent = sl < 0.15 ? "healthy" : sl < 0.4 ? "watch" : "sloppy";
+    }
+    $("ai-share").innerHTML = e.slop.n ? "<span class='badge ai' title='commits by bots or with AI co-author / marker evidence'>AI " + Math.round(e.slop.ai / e.slop.n * 100) + "% of commits</span>" : "";
+    // drift of a tag-based env vs the trunk env
+    var trunkEnv = envs().filter(function (o) { return !isTags(o); })[0];
+    if (isTags(e) && trunkEnv) {
+      var ab = head.s.ab || null, tl = trunkEnv.snaps[trunkEnv.snaps.length - 1], dl = (tl.p + tl.t) - (head.s.p + head.s.t);
+      $("drift").classList.remove("hidden");
+      $("drift").innerHTML = e.id + " vs " + esc(trunkEnv.id) + ": <b>" + sgn(-dl).replace("−", "") + " LOC " + (dl >= 0 ? "behind" : "ahead") + "</b>" + (ab ? " · " + ab[1] + " commits behind · " + ab[0] + " ahead" : "") + " · last deploy " + fmtD(head.d);
+    } else $("drift").classList.add("hidden");
+    $("repo-name").innerHTML = repo().url ? "<a href='" + esc(repo().url) + "' target='_blank' rel='noopener' style='color:inherit;text-decoration:none'>" + esc(repo().name) + " ↗</a>" : esc(repo().name);
+
+    // KPIs
+    var p0 = val(first, "p"), p1 = val(last, "p"), t0 = val(first, "t"), t1 = val(last, "t");
+    var grp = state.group ? " · " + state.group : "";
+    var lbl = state.metric === "nb" ? "LOC" : M.label;
+    kpi("kpi-prod", "Production " + lbl + grp, fmt(p1), "", sgn(p1 - p0) + " <b>(" + pctStr(p1, p0) + ")</b> · " + fmt(filesOf(last, "p")) + " files", vis, "p", C.prod);
+    kpi("kpi-test", "Test " + lbl + grp, fmt(t1), "", sgn(t1 - t0) + " <b>(" + pctStr(t1, t0) + ")</b> · " + fmt(filesOf(last, "t")) + " files", vis, "t", C.test);
+    var r1 = ratio(p1, t1), r0 = ratio(p0, t0);
+    kpi("kpi-ratio", "Test / production", r1.toFixed(2), "×", (r1 - r0 >= 0 ? "+" : "−") + Math.abs(r1 - r0).toFixed(2) + "× since " + fmtD(first.d) + " · " + (r1 >= 1 ? "tests lead" : "prod leads"), vis, "r", "#8a939d");
+    var net = (p1 - p0) + (t1 - t0);
+    kpi("kpi-net", "Net change · selected range", short(net), "", short(p1 - p0) + " prod · " + short(t1 - t0) + " tests · " + fmt(realCount) + " " + snapWord(e, realCount), vis, "n", "#8a939d");
+    $("kpi-net").querySelector(".v").style.color = net >= 0 ? "var(--text)" : "var(--muted)";
+
+    // chart header
+    $("chart-title").innerHTML = "Production &amp; test " + esc(lbl) + " over time" + (state.group ? " <span style='color:var(--prod)'>· " + esc(state.group) + "</span>" : "");
+    $("chart-sub").textContent = fmtD(first.d, true) + " – " + fmtD(last.d, true) + " · " + fmt(realCount) + " " + (isTags(e) ? snapWord(e, realCount) : "daily snapshots") + (vis.length !== realCount && !isTags(e) ? " · " + fmt(vis.length - realCount) + " quiet day" + (vis.length - realCount === 1 ? "" : "s") : "");
+    $("lg-prod").textContent = fmt(p1); $("lg-test").textContent = fmt(t1);
+    $("cap-left").textContent = (state.group ? "Focused on " + state.group + " · " : "") + M.cap;
+    var others = envs().filter(function (o) { return o.id !== e.id && isTags(o); });
+    $("repo-hint").innerHTML = D.repos.length > 1 ? "<kbd>[</kbd> <kbd>]</kbd> switch repo · " : "";
+    $("mark-hint").innerHTML = others.length ? others.map(function (o) { return "<span style='color:" + envColor(o.id) + "'>▲</span> " + esc(o.id) + " deploy"; }).join(" · ") + " · " : "";
+
+    drawChart(vis);
+    drawBrush(all);
+    drawMovement(vis);
+    drawLive(last, first);
+    drawLangs(last);
+    drawAuthors(vis);
+    drawMovers(vis);
+    if (state.table) drawTable(vis);
+    drawPRs(vis);
+  }
+  function pctStr(a, b) { return b ? ((a - b) / b * 100).toFixed(1) + "%" : "new"; }
+  function filesOf(x, cls) { if (state.group) { var g = groupsOf(x.s.g)[state.group] || [0, 0, 0, 0]; return cls === "p" ? g[2] : g[3]; } return cls === "p" ? x.s.pf : x.s.tf; }
+
+  function kpi(id, k, v, unit, d, vis, series, color) {
+    var c = $(id);
+    c.querySelector(".k span").textContent = k;
+    c.querySelector(".v").innerHTML = esc(v) + (unit ? "<small>" + unit + "</small>" : "");
+    c.querySelector(".d").innerHTML = d;
+    var svg = c.querySelector("svg.spark");
+    var W = 200, H = 60, vals = vis.map(function (x) {
+      if (series === "p") return val(x, "p"); if (series === "t") return val(x, "t");
+      if (series === "r") return ratio(val(x, "p"), val(x, "t"));
+      return val(x, "p") + val(x, "t") - val(vis[0], "p") - val(vis[0], "t");
+    });
+    var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals); if (mx === mn) mx = mn + 1;
+    var pts = vals.map(function (v, i) { return [(i / Math.max(1, vals.length - 1)) * W, H - 4 - (v - mn) / (mx - mn) * (H - 10)]; });
+    var line = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.setAttribute("preserveAspectRatio", "none");
+    svg.innerHTML = "<defs><linearGradient id='sg-" + id + "' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='" + color + "' stop-opacity='.35'/><stop offset='1' stop-color='" + color + "' stop-opacity='0'/></linearGradient></defs>" +
+      "<path d='" + line + " L" + W + " " + H + " L0 " + H + " Z' fill='url(#sg-" + id + ")'/><path d='" + line + "' fill='none' stroke='" + color + "' stroke-width='1.5' vector-effect='non-scaling-stroke' opacity='.7'/>";
+  }
+
+  /* ---------- main chart ---------- */
+  var chartGeom = null;
+  function drawChart(vis) {
+    var box = $("chart"), W = box.clientWidth, H = box.clientHeight;
+    if (W < 100) return;
+    var padL = 70, padR = 132, padT = 24, padB = 46, iw = W - padL - padR, ih = H - padT - padB;
+    var mode = state.mode, first = vis[0];
+    function P(x) { return mode === "delta" ? val(x, "p") - val(first, "p") : val(x, "p"); }
+    function T(x) { return mode === "delta" ? val(x, "t") - val(first, "t") : val(x, "t"); }
+    function R(x) { return ratio(val(x, "p"), val(x, "t")); }
+    var lo = 0, hi = 1;
+    if (mode === "ratio") { hi = 0; vis.forEach(function (x) { hi = Math.max(hi, R(x)); }); hi = Math.max(0.1, Math.ceil(hi * 4) / 4); }
+    else { vis.forEach(function (x) { hi = Math.max(hi, P(x), T(x)); lo = Math.min(lo, P(x), T(x)); }); hi = niceCeil(hi); lo = lo < 0 ? -niceCeil(-lo) : 0; }
+    var t0 = vis[0].t, t1 = vis[vis.length - 1].t;
+    function X(t) { return t1 === t0 ? padL + iw / 2 : padL + (t - t0) / (t1 - t0) * iw; }
+    function Y(v) { return padT + ih - (v - lo) / (hi - lo) * ih; }
+    chartGeom = { X: X, Y: Y, P: P, T: T, R: R, padL: padL, iw: iw, t0: t0, t1: t1, vis: vis, H: H, padT: padT, padB: padB };
+
+    var s = "<svg viewBox='0 0 " + W + " " + H + "' width='" + W + "' height='" + H + "'>";
+    s += "<defs><linearGradient id='gp' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='" + C.prod + "' stop-opacity='.22'/><stop offset='1' stop-color='" + C.prod + "' stop-opacity='0'/></linearGradient>" +
+         "<linearGradient id='gt' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='" + C.test + "' stop-opacity='.22'/><stop offset='1' stop-color='" + C.test + "' stop-opacity='0'/></linearGradient>" +
+         "<clipPath id='clip'><rect x='" + padL + "' y='0' width='" + iw + "' height='" + H + "'/></clipPath></defs>";
+    // grid + y labels
+    s += "<g class='grid ax'>";
+    var steps = 5;
+    for (var i = 0; i <= steps; i++) {
+      var v = lo + (hi - lo) * i / steps, y = Y(v);
+      s += "<line x1='" + padL + "' x2='" + (W - padR) + "' y1='" + y + "' y2='" + y + "'/>";
+      s += "<text x='" + (padL - 10) + "' y='" + (y + 3.5) + "' text-anchor='end'>" + (mode === "ratio" ? v.toFixed(2) + "×" : fmt(v)) + "</text>";
+    }
+    s += "<text class='cap' x='" + padL + "' y='" + (padT - 10) + "'>" + (mode === "ratio" ? "TEST / PROD RATIO" : mode === "delta" ? "Δ " + METRIC[state.metric].unit.toUpperCase() + " FROM RANGE START" : METRIC[state.metric].unit.toUpperCase() + " OF SOURCE") + "</text></g>";
+    if (lo < 0) s += "<g class='base'><line x1='" + padL + "' x2='" + (W - padR) + "' y1='" + Y(0) + "' y2='" + Y(0) + "'/></g>";
+    // x ticks
+    var n = Math.max(2, Math.min(8, Math.floor(iw / 105)));
+    s += "<g class='ax'>";
+    for (var k = 0; k <= n; k++) {
+      var tt = t0 + (t1 - t0) * k / n, idx = Math.round((tt - t0) / DAY), x = X(vis[Math.min(vis.length - 1, Math.max(0, idx))].t);
+      s += "<text x='" + x + "' y='" + (H - padB + 20) + "' text-anchor='middle'>" + fmtD(vis[Math.min(vis.length - 1, Math.max(0, idx))].d, (t1 - t0) > 400 * DAY) + "</text>";
+    }
+    s += "<text class='cap' x='" + (W - padR) + "' y='" + (H - 8) + "' text-anchor='end'>DATE (UTC)</text></g>";
+    // series
+    var showDots = vis.length <= 220;
+    function series(getter, grad, color, key) {
+      var pts = vis.map(function (x) { return [X(x.t), Y(getter(x))]; });
+      var line = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
+      var base = Y(Math.max(lo, 0));
+      var out = "<g clip-path='url(#clip)'>";
+      if (mode !== "ratio") out += "<path d='" + line + " L" + pts[pts.length - 1][0].toFixed(1) + " " + base + " L" + pts[0][0].toFixed(1) + " " + base + " Z' fill='url(#" + grad + ")'/>";
+      out += "<path d='" + line + "' fill='none' stroke='" + color + "' stroke-width='1.6' stroke-linejoin='round'/>";
+      if (showDots) vis.forEach(function (x, i) { if (x.real) out += "<circle cx='" + pts[i][0].toFixed(1) + "' cy='" + pts[i][1].toFixed(1) + "' r='2.2' fill='" + color + "' stroke='#12151a' stroke-width='1'/>"; });
+      out += "</g>";
+      var lp = pts[pts.length - 1];
+      out += "<g class='lbl'><circle cx='" + lp[0] + "' cy='" + lp[1] + "' r='3.5' fill='" + color + "'/><line x1='" + lp[0] + "' x2='" + (lp[0] + 10) + "' y1='" + lp[1] + "' y2='" + lp[1] + "' stroke='" + color + "' stroke-width='1'/>" +
+             "<text class='lbl' x='" + (lp[0] + 14) + "' y='" + (lp[1] + 3.5) + "' style='fill:#e8ece6;font-weight:600;font-size:11px'>" + key + " " + (mode === "ratio" ? getter(vis[vis.length - 1]).toFixed(2) + "×" : (mode === "delta" ? sgn(getter(vis[vis.length - 1])) : fmt(getter(vis[vis.length - 1])))) + "</text></g>";
+      return out;
+    }
+    if (mode === "ratio") {
+      s += "<g class='base'><line x1='" + padL + "' x2='" + (W - padR) + "' y1='" + Y(1) + "' y2='" + Y(1) + "' stroke-dasharray='4 4'/></g>";
+      s += series(R, "gp", "#e8ece6", "Ratio");
+    } else {
+      // draw the smaller series on top so both stay visible
+      var lastP = P(vis[vis.length - 1]), lastT = T(vis[vis.length - 1]);
+      if (lastP >= lastT) { s += series(P, "gp", C.prod, "Prod"); s += series(T, "gt", C.test, "Tests"); }
+      else { s += series(T, "gt", C.test, "Tests"); s += series(P, "gp", C.prod, "Prod"); }
+      // nudge overlapping end labels apart
+    }
+    // deploy markers from other environments (stg/prd tags) along the x axis
+    var marks = (env().marks || []).filter(function (m) { var t = ts(m.d); return t >= t0 && t <= t1; });
+    if (marks.length && marks.length <= 80) {
+      s += "<g class='marks'>";
+      marks.forEach(function (m, i) {
+        var mx = X(ts(m.d)), c = envColor(m.env), yb = H - padB;
+        s += "<path data-i='" + i + "' d='M" + (mx - 5) + " " + (yb + 8) + " L" + mx + " " + (yb + 1) + " L" + (mx + 5) + " " + (yb + 8) + " Z' fill='" + c + "' opacity='.9' style='cursor:help'/>";
+      });
+      s += "</g>";
+    }
+    // crosshair
+    s += "<g class='cross' id='cross' style='display:none'><line y1='" + padT + "' y2='" + (H - padB) + "'/><circle r='4' fill='" + C.prod + "' stroke='#12151a' stroke-width='2'/><circle r='4' fill='" + C.test + "' stroke='#12151a' stroke-width='2'/></g>";
+    s += "<rect class='overlay' x='" + padL + "' y='0' width='" + iw + "' height='" + H + "'/>";
+    s += "</svg>";
+    box.innerHTML = s;
+    fixLabels(box);
+
+    var svg = box.querySelector("svg"), ov = box.querySelector(".overlay");
+    box.querySelectorAll(".marks path").forEach(function (pth) {
+      var m = marks[+pth.getAttribute("data-i")];
+      pth.addEventListener("mousemove", function (ev) { ev.stopPropagation(); showTip("<div class='t' style='color:" + envColor(m.env) + "'>" + esc(m.tag || m.env) + "</div><div class='r'><span>Deployed to " + esc(m.env) + "</span><b>" + fmtD(m.d, true) + "</b></div><div class='f'>click to switch to " + esc(m.env) + "</div>", ev.clientX, ev.clientY); });
+      pth.addEventListener("mouseleave", hideTip);
+      pth.addEventListener("click", function () { state.env = m.env; state.pin = m.d; buildEnvs(); render(); });
+    });
+    function idxAt(clientX) {
+      var rect = svg.getBoundingClientRect();
+      var f = Math.max(0, Math.min(1, (clientX - rect.left - padL) / iw));
+      return Math.round(f * (vis.length - 1));
+    }
+    ov.addEventListener("mousemove", function (ev) { hover(idxAt(ev.clientX), ev.clientX, ev.clientY, false); });
+    ov.addEventListener("mouseleave", function () { if (state.pin) placePin(); else { $("cross").style.display = "none"; hideTip(); } });
+    ov.addEventListener("click", function (ev) {
+      var x = vis[idxAt(ev.clientX)];
+      state.pin = state.pin === x.d ? null : x.d; writeHash();
+      if (state.pin) hover(idxAt(ev.clientX), ev.clientX, ev.clientY, true); else { $("cross").style.display = "none"; hideTip(); }
+    });
+    if (state.pin) placePin();
+  }
+  function fixLabels(box) {
+    var labels = box.querySelectorAll("text.lbl");
+    if (labels.length === 2) {
+      var a = labels[0], b = labels[1], ya = +a.getAttribute("y"), yb = +b.getAttribute("y");
+      if (Math.abs(ya - yb) < 14) { var mid = (ya + yb) / 2, up = ya <= yb ? a : b, dn = up === a ? b : a; up.setAttribute("y", mid - 7); dn.setAttribute("y", mid + 7); }
+    }
+  }
+  function hover(i, cx, cy, pinned) {
+    var g = chartGeom; if (!g) return;
+    var x = g.vis[i], cross = $("cross"), X = g.X(x.t);
+    cross.style.display = ""; cross.className.baseVal = "cross" + (pinned ? " pinned" : "");
+    var ln = cross.children[0], c1 = cross.children[1], c2 = cross.children[2];
+    ln.setAttribute("x1", X); ln.setAttribute("x2", X);
+    if (state.mode === "ratio") { c1.setAttribute("cx", X); c1.setAttribute("cy", g.Y(g.R(x))); c1.setAttribute("fill", "#e8ece6"); c2.style.display = "none"; }
+    else { c2.style.display = ""; c1.setAttribute("cx", X); c1.setAttribute("cy", g.Y(g.P(x))); c1.setAttribute("fill", C.prod); c2.setAttribute("cx", X); c2.setAttribute("cy", g.Y(g.T(x))); }
+    showTip(dayTip(x, g.vis[0]), cx, cy);
+    if (pinned) { var rect = $("chart").getBoundingClientRect(); showTip(dayTip(x, g.vis[0]), rect.left + X, rect.top + g.padT + 30); }
+  }
+  function placePin() {
+    var g = chartGeom; if (!g) return; var i = -1;
+    g.vis.forEach(function (x, k) { if (x.d === state.pin) i = k; });
+    if (i < 0) { $("cross").style.display = "none"; hideTip(); return; }
+    var rect = $("chart").getBoundingClientRect();
+    hover(i, rect.left + g.X(g.vis[i].t), rect.top + g.padT + 30, true);
+  }
+
+  /* ---------- brush ---------- */
+  function drawBrush(all) {
+    var box = $("brush"), svg = box.querySelector("svg"), W = box.clientWidth, H = box.clientHeight;
+    if (W < 50) return;
+    var mx = 1; all.forEach(function (x) { mx = Math.max(mx, x.s.p, x.s.t); });
+    function X(t) { return (t - all[0].t) / Math.max(1, all[all.length - 1].t - all[0].t) * W; }
+    function Y(v) { return H - 3 - v / mx * (H - 8); }
+    function path(key) { return all.map(function (x, i) { return (i ? "L" : "M") + X(x.t).toFixed(1) + " " + Y(x.s[key]).toFixed(1); }).join(" "); }
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.innerHTML = "<path d='" + path("p") + "' fill='none' stroke='" + C.prod + "' stroke-width='1' opacity='.7'/><path d='" + path("t") + "' fill='none' stroke='" + C.test + "' stroke-width='1' opacity='.7'/>";
+    $("br-l").textContent = fmtD(all[0].d, true); $("br-r").textContent = fmtD(all[all.length - 1].d, true);
+    var r = range(), x0 = X(r[0]), x1 = X(r[1]);
+    $("bsel").style.left = x0 + "px"; $("bsel").style.width = Math.max(2, x1 - x0) + "px";
+    $("h0").style.left = (x0 - 5) + "px"; $("h1").style.left = (x1 - 5) + "px";
+    brushGeom = { W: W, all: all, X: X };
+  }
+  var brushGeom = null, drag = null;
+  function brushTAt(clientX) {
+    var g = brushGeom, rect = $("brush").getBoundingClientRect();
+    var f = Math.max(0, Math.min(1, (clientX - rect.left) / g.W));
+    var t = g.all[0].t + f * (g.all[g.all.length - 1].t - g.all[0].t);
+    return Math.round(t / DAY) * DAY;
+  }
+  ["h0", "h1", "bsel"].forEach(function (id) {
+    $(id).addEventListener("pointerdown", function (ev) {
+      ev.preventDefault(); var r = range();
+      drag = { id: id, start: brushTAt(ev.clientX), from: r[0], to: r[1] };
+      $(id).setPointerCapture(ev.pointerId);
+    });
+  });
+  document.addEventListener("pointermove", function (ev) {
+    if (!drag) return;
+    var t = brushTAt(ev.clientX), all = brushGeom.all, lo = all[0].t, hi = all[all.length - 1].t, from = drag.from, to = drag.to;
+    if (drag.id === "h0") from = Math.min(t, to);
+    else if (drag.id === "h1") to = Math.max(t, from);
+    else { var dt = t - drag.start, span = to - from; from = Math.max(lo, Math.min(hi - span, from + dt)); to = from + span; }
+    state.from = iso(from); state.to = iso(to); state.days = null; state.pin = null;
+    buildRanges(); render();
+  });
+  document.addEventListener("pointerup", function () { drag = null; });
+
+  /* ---------- daily movement ---------- */
+  function drawMovement(vis) {
+    var box = $("move"), W = box.clientWidth, H = box.clientHeight;
+    if (W < 50) return;
+    var weekly = vis.length > 120;
+    var buckets = [];
+    if (weekly) {
+      var cur = null;
+      vis.forEach(function (x) {
+        var wk = Math.floor((x.t + 3 * DAY) / (7 * DAY));
+        if (!cur || cur.wk !== wk) { cur = { wk: wk, d: x.d, d2: x.d, p: 0, t: 0, pa: 0, pd: 0, ta: 0, td: 0, c: 0 }; buckets.push(cur); }
+        cur.d2 = x.d; if (x.m) add(cur, x.m);
+      });
+    } else vis.forEach(function (x) { var b = { d: x.d, d2: x.d, p: 0, t: 0, pa: 0, pd: 0, ta: 0, td: 0, c: 0 }; if (x.m) add(b, x.m); buckets.push(b); });
+    function add(b, m) {
+      var g = state.group ? (groupsOf(m.g)[state.group] || [0, 0]) : null;
+      b.p += g ? g[0] : m.pa - m.pd; b.t += g ? g[1] : m.ta - m.td;
+      b.pa += m.pa; b.pd += m.pd; b.ta += m.ta; b.td += m.td; b.c += m.c;
+    }
+    var hi = 1, lo = 0; buckets.forEach(function (b) { hi = Math.max(hi, b.p, b.t); lo = Math.min(lo, b.p, b.t); });
+    hi = niceCeil(hi); lo = lo < 0 ? -niceCeil(-lo) : 0;
+    var padL = 46, padR = 8, padT = 10, padB = 22, iw = W - padL - padR, ih = H - padT - padB;
+    function Y(v) { return padT + ih - (v - lo) / (hi - lo) * ih; }
+    var y0 = Y(0), mx = hi;
+    var slot = iw / buckets.length, bw = Math.max(1, Math.min(9, (slot - 3) / 2));
+    var s = "<svg viewBox='0 0 " + W + " " + H + "' width='" + W + "' height='" + H + "'><g class='ax'>";
+    [hi, 0].concat(lo < 0 && -lo > hi * 0.12 ? [lo] : []).forEach(function (v) { s += "<text x='" + (padL - 8) + "' y='" + (Y(v) + 3.5) + "' text-anchor='end'>" + (v === 0 ? "0" : short(v)) + "</text>"; });
+    s += "</g><g class='base'><line x1='" + padL + "' x2='" + (W - padR) + "' y1='" + y0 + "' y2='" + y0 + "'/></g>";
+    var total = 0, totP = 0, totT = 0;
+    buckets.forEach(function (b, i) {
+      total += b.p + b.t; totP += b.p; totT += b.t;
+      var x = padL + i * slot + (slot - (2 * bw + 2)) / 2;
+      [["p", C.prod, x], ["t", C.test, x + bw + 2]].forEach(function (q) {
+        var v = b[q[0]]; if (!v) return;
+        var top = Math.min(Y(v), y0), h = Math.max(1, Math.abs(Y(v) - y0));
+        s += "<rect x='" + q[2].toFixed(1) + "' y='" + top.toFixed(1) + "' width='" + bw.toFixed(1) + "' height='" + h.toFixed(1) + "' rx='1.5' fill='" + q[1] + "' opacity='" + (v < 0 ? .55 : .9) + "'/>";
+      });
+      s += "<rect data-i='" + i + "' class='hit' x='" + (padL + i * slot).toFixed(1) + "' y='0' width='" + slot.toFixed(1) + "' height='" + H + "' fill='transparent'/>";
+    });
+    var n = Math.max(2, Math.min(6, Math.floor(iw / 90)));
+    s += "<g class='ax'>";
+    for (var k = 0; k <= n; k++) { var bi = Math.round((buckets.length - 1) * k / n); s += "<text x='" + (padL + bi * slot + slot / 2) + "' y='" + (H - 6) + "' text-anchor='middle'>" + fmtD(buckets[bi].d) + "</text>"; }
+    s += "</g></svg>";
+    box.innerHTML = s;
+    $("move-sub").textContent = (isTags(env()) ? (weekly ? "Two bars per week · merged between deploys" : "Two bars per deploy day · merged since previous deploy") : (weekly ? "Two bars per week" : "Two bars per day") + " · additions minus removals") + (state.group ? " · " + state.group : "");
+    $("move-total").innerHTML = "<b>" + short(total) + "</b> total<br>" + short(totP) + " prod · " + short(totT) + " tests";
+    box.querySelectorAll(".hit").forEach(function (r) {
+      r.addEventListener("mousemove", function (ev) {
+        var b = buckets[+r.getAttribute("data-i")];
+        var h = "<div class='t'>" + fmtD(b.d, true) + (b.d2 !== b.d ? " – " + fmtD(b.d2) : "") + "</div>";
+        h += "<div class='r'><span><i style='background:" + C.prod + "'></i>Production net</span><b>" + sgn(b.p) + "</b></div>";
+        h += "<div class='r'><span>&nbsp;&nbsp; added / removed</span><b style='color:var(--muted)'>" + fmt(b.pa) + " / " + fmt(b.pd) + "</b></div>";
+        h += "<div class='r'><span><i style='background:" + C.test + "'></i>Tests net</span><b>" + sgn(b.t) + "</b></div>";
+        h += "<div class='r'><span>&nbsp;&nbsp; added / removed</span><b style='color:var(--muted)'>" + fmt(b.ta) + " / " + fmt(b.td) + "</b></div>";
+        h += "<div class='f'>" + b.c + " commit" + (b.c === 1 ? "" : "s") + " · first-parent numstat</div>";
+        showTip(h, ev.clientX, ev.clientY);
+      });
+      r.addEventListener("mouseleave", hideTip);
+    });
+  }
+
+  /* ---------- where the lines live ---------- */
+  function drawLive(last, first) {
+    var box = $("live"), g = groupsOf(last.s.g), g0 = groupsOf(first.s.g), items = [];
+    Array.prototype.forEach.call($("rollup").children, function (b) { b.className = (b.getAttribute("data-r") === "1") === state.rollup ? "on" : ""; });
+    for (var k in g) items.push({ n: k, p: g[k][0], t: g[k][1], pf: g[k][2], tf: g[k][3], dp: g[k][0] - (g0[k] ? g0[k][0] : 0), dt: g[k][1] - (g0[k] ? g0[k][1] : 0) });
+    items.sort(function (a, b) { return (b.p + b.t) - (a.p + a.t); });
+    var top = items.slice(0, 14), rest = items.slice(14);
+    if (rest.length) top.push(rest.reduce(function (acc, r) { acc.p += r.p; acc.t += r.t; acc.pf += r.pf; acc.tf += r.tf; acc.dp += r.dp; acc.dt += r.dt; return acc; }, { n: "other (" + rest.length + ")", p: 0, t: 0, pf: 0, tf: 0, dp: 0, dt: 0, other: true }));
+    var mx = Math.max(1, top[0] ? top[0].p + top[0].t : 1);
+    $("live-sub").textContent = "Snapshot · " + fmtD(last.d, true) + " · " + items.length + " directories · " + last.s.sha;
+    box.innerHTML = "";
+    top.forEach(function (it) {
+      var row = el("div", { "class": "row" + (state.group === it.n ? " on" : ""), title: it.other ? "" : "click to focus the chart on " + it.n });
+      row.innerHTML = "<span class='n'>" + esc(it.n) + "</span><div class='bar'><i class='p' style='width:" + (it.p / mx * 100) + "%'></i><i class='t' style='width:" + (it.t / mx * 100) + "%'></i></div><span class='val'>" + shortAbs(it.p + it.t) + "</span>";
+      row.addEventListener("mousemove", function (ev) {
+        var h = "<div class='t'>" + esc(it.n) + "</div>";
+        h += "<div class='r'><span><i style='background:" + C.prod + "'></i>Production</span><b>" + fmt(it.p) + "</b></div>";
+        h += "<div class='r'><span><i style='background:" + C.test + "'></i>Tests</span><b>" + fmt(it.t) + "</b></div>";
+        h += "<div class='r'><span>Test / prod</span><b>" + ratio(it.p, it.t).toFixed(2) + "×</b></div>";
+        h += "<div class='r'><span>Files</span><b>" + fmt(it.pf) + " / " + fmt(it.tf) + "</b></div>";
+        h += "<div class='r'><span>Δ in range</span><b>" + sgn(it.dp) + " / " + sgn(it.dt) + "</b></div>";
+        h += "<div class='f'>share of codebase " + (((it.p + it.t) / Math.max(1, last.s.p + last.s.t)) * 100).toFixed(1) + "%</div>";
+        showTip(h, ev.clientX, ev.clientY);
+      });
+      row.addEventListener("mouseleave", hideTip);
+      if (!it.other) row.onclick = function () { state.group = state.group === it.n ? null : it.n; state.pin = null; render(); };
+      box.appendChild(row);
+    });
+    $("live-hint").textContent = state.group ? "focused on " + state.group + " · esc to clear" : "click a row to focus it";
+  }
+
+  /* ---------- languages ---------- */
+  function drawLangs(last) {
+    var box = $("langs"), l = last.s.l, items = [];
+    for (var k in l) items.push({ n: k, p: l[k][0], t: l[k][1] });
+    items.sort(function (a, b) { return (b.p + b.t) - (a.p + a.t); });
+    var top = items.slice(0, 9), mx = Math.max(1, top[0] ? top[0].p + top[0].t : 1), tot = last.s.p + last.s.t;
+    $("lang-sub").textContent = items.length + " file types · " + fmt(tot) + " nonblank lines";
+    box.innerHTML = "";
+    top.forEach(function (it) {
+      var row = el("div", { "class": "row" });
+      row.innerHTML = "<span class='n'>." + esc(it.n) + "</span><div class='bar'><i class='p' style='width:" + (it.p / mx * 100) + "%'></i><i class='t' style='width:" + (it.t / mx * 100) + "%'></i></div><span class='val'>" + shortAbs(it.p + it.t) + "<small>" + (((it.p + it.t) / Math.max(1, tot)) * 100).toFixed(0) + "%</small></span>";
+      row.addEventListener("mousemove", function (ev) {
+        showTip("<div class='t'>." + esc(it.n) + "</div><div class='r'><span><i style='background:" + C.prod + "'></i>Production</span><b>" + fmt(it.p) + "</b></div><div class='r'><span><i style='background:" + C.test + "'></i>Tests</span><b>" + fmt(it.t) + "</b></div><div class='r'><span>Test / prod</span><b>" + ratio(it.p, it.t).toFixed(2) + "×</b></div>", ev.clientX, ev.clientY);
+      });
+      row.addEventListener("mouseleave", hideTip);
+      box.appendChild(row);
+    });
+  }
+
+  /* ---------- authors ---------- */
+  function drawAuthors(vis) {
+    var box = $("authors"), acc = {}, humans = 0, bots = 0, hl = 0, bl = 0, aiL = 0, allL = 0, aiC = 0, allC = 0;
+    vis.forEach(function (x) { if (!x.m) return; aiL += x.m.al || 0; allL += x.m.pa + x.m.ta; aiC += x.m.ai || 0; allC += x.m.c; for (var a in x.m.a) { var r = x.m.a[a], o = acc[a] || (acc[a] = { n: a, p: 0, t: 0, c: 0, bot: !!r[3], ai: 0, ail: 0 }); o.p += r[0]; o.t += r[1]; o.c += r[2]; o.ai += r[4] || 0; o.ail += r[5] || 0; } });
+    var items = Object.keys(acc).map(function (k) { return acc[k]; }).sort(function (a, b) { return (b.p + b.t) - (a.p + a.t); });
+    items.forEach(function (it) { if (it.bot) { bots++; bl += it.p + it.t; } else { humans++; hl += it.p + it.t; } });
+    var mx = Math.max(1, items[0] ? items[0].p + items[0].t : 1);
+    $("auth-sub").innerHTML = humans + " human" + (humans === 1 ? "" : "s") + " · " + bots + " bot" + (bots === 1 ? "" : "s") + " · <span class='badge ai'>AI-assisted " + (allL ? Math.round(aiL / allL * 100) : 0) + "% of lines · " + (allC ? Math.round(aiC / allC * 100) : 0) + "% of commits</span>";
+    box.innerHTML = items.length ? "" : "<div class='empty'>no commits in range</div>";
+    items.slice(0, 9).forEach(function (it) {
+      var row = el("div", { "class": "row" });
+      row.innerHTML = "<span class='n'>" + (it.bot ? "🤖 " : "") + esc(it.n) + "</span><div class='bar'><i class='" + (it.bot ? "b" : "p") + "' style='width:" + (it.p / mx * 100) + "%'></i><i class='" + (it.bot ? "b" : "t") + "' style='width:" + (it.t / mx * 100) + "%'></i></div><span class='val'>" + shortAbs(it.p + it.t) + "<small>" + it.c + "c" + (it.ai && !it.bot ? " · AI " + Math.round(it.ai / it.c * 100) + "%" : "") + "</small></span>";
+      row.addEventListener("mousemove", function (ev) {
+        showTip("<div class='t'>" + esc(it.n) + (it.bot ? " · bot" : "") + "</div><div class='r'><span>AI-assisted commits</span><b>" + it.ai + " / " + it.c + "</b></div><div class='r'><span>AI-assisted lines</span><b>" + fmt(it.ail) + "</b></div><div class='r'><span><i style='background:" + C.prod + "'></i>Prod lines added</span><b>" + fmt(it.p) + "</b></div><div class='r'><span><i style='background:" + C.test + "'></i>Test lines added</span><b>" + fmt(it.t) + "</b></div><div class='r'><span>Commits</span><b>" + it.c + "</b></div><div class='r'><span>Lines / commit</span><b>" + fmt((it.p + it.t) / Math.max(1, it.c)) + "</b></div>", ev.clientX, ev.clientY);
+      });
+      row.addEventListener("mouseleave", hideTip);
+      box.appendChild(row);
+    });
+  }
+
+  /* ---------- top movers ---------- */
+  function drawMovers(vis) {
+    var box = $("movers"), acc = {};
+    vis.forEach(function (x) { if (!x.m) return; var gg = groupsOf(x.m.g); for (var g in gg) { var r = gg[g], o = acc[g] || (acc[g] = { n: g, p: 0, t: 0 }); o.p += r[0]; o.t += r[1]; } });
+    var items = Object.keys(acc).map(function (k) { return acc[k]; }).filter(function (o) { return o.p || o.t; }).sort(function (a, b) { return Math.abs(b.p + b.t) - Math.abs(a.p + a.t); }).slice(0, 9);
+    var mx = 1; items.forEach(function (o) { mx = Math.max(mx, Math.abs(o.p), Math.abs(o.t)); });
+    $("mov-sub").textContent = items.length ? fmtD(vis[0].d) + " – " + fmtD(vis[vis.length - 1].d) + " · by |net change|" : "";
+    box.innerHTML = items.length ? "" : "<div class='empty'>no movement in range</div>";
+    items.forEach(function (it) {
+      var row = el("div", { "class": "row" + (state.group === it.n ? " on" : ""), title: "click to focus the chart on " + it.n });
+      function seg(v, cls, top) { var w = Math.abs(v) / mx * 50; return "<i class='" + cls + "' style='top:" + top + "px;height:3px;left:" + (v < 0 ? 50 - w : 50) + "%;width:" + w + "%'></i>"; }
+      row.innerHTML = "<span class='n'>" + esc(it.n) + "</span><div class='bar div'><span class='mid'></span>" + seg(it.p, "p", 0) + seg(it.t, "t", 4) + "</div><span class='val" + (it.p + it.t < 0 ? " neg" : "") + "'>" + short(it.p + it.t) + "</span>";
+      row.addEventListener("mousemove", function (ev) {
+        showTip("<div class='t'>" + esc(it.n) + "</div><div class='r'><span><i style='background:" + C.prod + "'></i>Production net</span><b>" + sgn(it.p) + "</b></div><div class='r'><span><i style='background:" + C.test + "'></i>Tests net</span><b>" + sgn(it.t) + "</b></div>", ev.clientX, ev.clientY);
+      });
+      row.addEventListener("mouseleave", hideTip);
+      row.onclick = function () { state.group = state.group === it.n ? null : it.n; state.pin = null; render(); };
+      box.appendChild(row);
+    });
+  }
+
+  /* ---------- merged PRs ---------- */
+  function prsFor(x) {
+    var all = repo().prs || {}, e = env();
+    if (!isTags(e)) return all[x.d] || [];
+    // a deploy carries every PR merged since the previous deploy
+    var dn = dense(), i = x.i, prev = null;
+    for (var k = i - 1; k >= 0; k--) if (dn[k].real) { prev = dn[k]; break; }
+    var out = [], from = prev ? prev.t : -Infinity;
+    for (var d in all) { var t = ts(d); if (t > from && t <= x.t) out = out.concat(all[d]); }
+    return out;
+  }
+  function drawPRs(vis) {
+    var box = $("prs"), x = null;
+    if (state.pin) vis.forEach(function (v) { if (v.d === state.pin) x = v; });
+    if (!x || !repo().prs) { box.classList.add("hidden"); return; }
+    var prs = prsFor(x).slice().sort(function (a, b) { return Math.abs(b.d) - Math.abs(a.d); });
+    box.classList.remove("hidden");
+    var ai = prs.filter(function (p) { return p.ai; }).length;
+    var h = "<div class='h'><span>Merged pull requests · <b>" + fmtD(x.d, true) + "</b>" + (isTags(env()) ? " · since previous deploy" : "") + "</span><span><b>" + prs.length + "</b> PRs" + (ai ? " · " + ai + " AI-flagged" : "") + " · <b>" + short(prs.reduce(function (a, p) { return a + p.d; }, 0)) + "</b> net lines (GitHub, all files)</span></div>";
+    if (!prs.length) h += "<div class='empty'>no pull requests merged" + (isTags(env()) ? " in this deploy" : " that day") + " (direct pushes or squash without PR)</div>";
+    prs.slice(0, 40).forEach(function (p) {
+      h += "<a class='pr' href='" + esc(p.u) + "' target='_blank' rel='noopener'><span class='n'>#" + p.n + "</span><span class='t'>" + esc(p.t) + (p.ai ? " <span class='badge ai'>AI</span>" : "") + "</span><span class='a'>" + esc(p.a) + "</span><span class='d" + (p.d > 0 ? " pos" : "") + "'>" + short(p.d) + "</span></a>";
+    });
+    if (prs.length > 40) h += "<div class='empty'>… " + (prs.length - 40) + " more</div>";
+    box.innerHTML = h;
+  }
+
+  /* ---------- fleet ---------- */
+  var fleetSort = { key: "loc", dir: -1 };
+  function fleetRows() {
+    var now = 0; D.repos.forEach(function (r) { r.envs.forEach(function (e) { now = Math.max(now, ts(e.snaps[e.snaps.length - 1].d)); }); });
+    return D.repos.map(function (r) {
+      var e = r.envs.filter(function (o) { return !isTags(o); })[0] || r.envs[0], sn = e.snaps, last = sn[sn.length - 1];
+      function at(t) { var b = sn[0]; for (var i = 0; i < sn.length; i++) { if (ts(sn[i].d) <= t) b = sn[i]; else break; } return b; }
+      var d30 = at(ts(last.d) - 30 * DAY), d90 = at(ts(last.d) - 90 * DAY);
+      var c = 0, ai = 0, lines = 0, ail = 0, cut = ts(last.d) - 90 * DAY;
+      e.moves.forEach(function (m) { if (ts(m.d) >= cut) { c += m.c; ai += m.ai || 0; lines += m.pa + m.ta; ail += m.al || 0; } });
+      var spark = []; for (var k = 0; k <= 30; k++) { var sx = at(ts(last.d) - 90 * DAY + k * 3 * DAY); spark.push(sx.p + sx.t); }
+      return { r: r, e: e, slug: r.slug, loc: last.p + last.t, p: last.p, t: last.t, ratio: ratio(last.p, last.t),
+        d30: (last.p + last.t) - (d30.p + d30.t), d30p: last.p - d30.p, d30t: last.t - d30.t, d90: (last.p + last.t) - (d90.p + d90.t),
+        slop: e.slop.ok === false ? null : e.slop.latest, ai: c ? ai / c : 0, ail: lines ? ail / lines : 0, commits: c,
+        last: last.d, age: Math.round((now - ts(last.d)) / DAY), envs: r.envs.map(function (o) { return o.id; }), days: sn.length, spark: spark, files: last.pf + last.tf };
+    });
+  }
+  function drawFleet() {
+    var rows = fleetRows(), k = fleetSort.key, dir = fleetSort.dir;
+    rows.sort(function (a, b) { var x = a[k], y = b[k]; if (x === null) return 1; if (y === null) return -1; if (typeof x === "string") return x.localeCompare(y) * dir; return (x - y) * dir; });
+    var totP = 0, totT = 0, totD30 = 0, act = 0, aiL = 0, allL = 0;
+    rows.forEach(function (r) { totP += r.p; totT += r.t; totD30 += r.d30; if (r.age <= 30) act++; });
+    D.repos.forEach(function (r) { var e = r.envs[0], cut = ts(e.snaps[e.snaps.length - 1].d) - 90 * DAY; e.moves.forEach(function (m) { if (ts(m.d) >= cut) { allL += m.pa + m.ta; aiL += m.al || 0; } }); });
+    $("fleet-sum").innerHTML = [
+      ["Repositories", D.repos.length, act + " active in last 30 days", "var(--text)"],
+      ["Production LOC", fmt(totP), "across all repos · nonblank", "var(--prod)"],
+      ["Test LOC", fmt(totT), "test / prod " + ratio(totP, totT).toFixed(2) + "×", "var(--test)"],
+      ["Net change · 30 days", short(totD30), "sum of per-repo 30-day deltas", "var(--text)"],
+      ["AI-assisted lines · 90 days", (allL ? Math.round(aiL / allL * 100) : 0) + "%", fmt(aiL) + " of " + fmt(allL) + " lines added", "#d7a6ff"]
+    ].map(function (c) { return "<div class='card kpi'><div class='k'><span>" + c[0] + "</span></div><div class='v' style='color:" + c[3] + "'>" + c[1] + "</div><div class='d'>" + c[2] + "</div></div>"; }).join("");
+    $("fleet-sub").textContent = D.repos.length + " repositories · trunk environment of each · sorted by " + k;
+    var cols = [["slug", "Repository"], ["loc", "LOC prod / test"], ["ratio", "Test / prod"], ["d30", "Δ 30 days"], ["d90", "Δ 90 days"], ["slop", "Slop"], ["ai", "AI share 90d"], ["last", "Last activity"], ["spark", "90-day trend"]];
+    var h = "<tr>" + cols.map(function (c) { return "<th data-k='" + c[0] + "' class='" + (c[0] === k ? "on" : "") + "'>" + c[1] + (c[0] === k ? (dir < 0 ? " ▾" : " ▴") : "") + "</th>"; }).join("") + "</tr>";
+    var mxLoc = Math.max.apply(null, rows.map(function (r) { return r.loc; })) || 1;
+    rows.forEach(function (r) {
+      var mn = Math.min.apply(null, r.spark), mx = Math.max.apply(null, r.spark); if (mx === mn) mx = mn + 1;
+      var pts = r.spark.map(function (v, i) { return (i ? "L" : "M") + (i / 30 * 110).toFixed(1) + " " + (24 - (v - mn) / (mx - mn) * 22).toFixed(1); }).join(" ");
+      var sl = r.slop === null ? "<span class='badge'>n/a</span>" : "<span class='badge " + (r.slop < 0.15 ? "good" : r.slop < 0.4 ? "warn" : "bad") + "'>" + Math.round(r.slop * 100) + "%</span>";
+      h += "<tr class='r' data-slug='" + esc(r.slug) + "'>" +
+        "<td class='repo'>" + esc(r.slug.split("/").pop()) + "<small>" + r.envs.join(" · ") + " · " + r.days + " snapshots · " + fmt(r.files) + " files</small></td>" +
+        "<td><div style='display:flex;align-items:center;gap:10px;justify-content:flex-end'><span>" + fmt(r.p) + " <span style='color:var(--faint)'>/</span> " + fmt(r.t) + "</span><div class='stack'><i class='p' style='width:" + (r.p / mxLoc * 100) + "%'></i><i class='t' style='width:" + (r.t / mxLoc * 100) + "%'></i></div></div></td>" +
+        "<td>" + r.ratio.toFixed(2) + "×</td><td class='" + (r.d30 ? "" : "mut") + "'>" + short(r.d30) + "</td><td class='" + (r.d90 ? "" : "mut") + "'>" + short(r.d90) + "</td><td>" + sl + "</td>" +
+        "<td>" + (r.commits ? Math.round(r.ai * 100) + "%<small style='color:var(--faint)'> · " + r.commits + "c</small>" : "<span class='mut'>—</span>") + "</td>" +
+        "<td class='" + (r.age > 60 ? "mut" : "") + "'>" + fmtD(r.last, true) + (r.age ? "<small style='color:var(--faint)'> · " + r.age + "d ago</small>" : "") + "</td>" +
+        "<td><svg viewBox='0 0 110 26'><path d='" + pts + "' fill='none' stroke='" + C.prod + "' stroke-width='1.4'/></svg></td></tr>";
+    });
+    $("fleet").innerHTML = h;
+    $("fleet").querySelectorAll("th").forEach(function (th) { th.onclick = function () { var kk = th.getAttribute("data-k"); if (kk === "spark") return; if (fleetSort.key === kk) fleetSort.dir *= -1; else { fleetSort.key = kk; fleetSort.dir = kk === "slug" || kk === "last" ? 1 : -1; } drawFleet(); }; });
+    $("fleet").querySelectorAll("tr.r").forEach(function (tr) { tr.onclick = function () { openRepo(tr.getAttribute("data-slug")); }; });
+  }
+
+  /* ---------- table ---------- */
+  function drawTable(vis) {
+    var t = $("tbl"), rows = vis.slice().reverse();
+    $("tbl-sub").textContent = rows.length + " days · " + fmtD(vis[0].d, true) + " – " + fmtD(vis[vis.length - 1].d, true);
+    var h = "<tr><th>Date</th><th>Prod LOC</th><th>Test LOC</th><th>Test/prod</th><th>Δ prod</th><th>Δ test</th><th>Commits</th><th>Snapshot</th></tr>";
+    rows.forEach(function (x, i) {
+      var prev = rows[i + 1], m = x.m || {};
+      h += "<tr><td>" + x.d + (x.real ? "" : " <span style='color:var(--faint)'>·</span>") + "</td><td>" + fmt(val(x, "p")) + "</td><td>" + fmt(val(x, "t")) + "</td><td>" + ratio(val(x, "p"), val(x, "t")).toFixed(2) + "×</td>" +
+        "<td class='mut'>" + (prev ? sgn(val(x, "p") - val(prev, "p")) : "") + "</td><td class='mut'>" + (prev ? sgn(val(x, "t") - val(prev, "t")) : "") + "</td><td class='mut'>" + (m.c || 0) + (m.bc ? " (" + m.bc + " bot)" : "") + "</td><td class='mut'>" + x.s.sha + "</td></tr>";
+    });
+    t.innerHTML = h;
+  }
+
+  function buildRepos() {
+    var sel = $("repo-sel"), multi = D.repos.length > 1;
+    $("repo-chip").classList.toggle("hidden", multi);
+    sel.classList.toggle("hidden", !multi);
+    if (!multi) return;
+    sel.innerHTML = "";
+    D.repos.slice().sort(function (a, b) { return a.slug.localeCompare(b.slug); }).forEach(function (r) {
+      var last = r.envs[0].snaps[r.envs[0].snaps.length - 1];
+      var o = el("option", { value: r.slug }, esc(r.slug) + "  ·  " + short(last.p + last.t).replace(/^\+/, "") + " LOC");
+      if (r.slug === state.repo) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = function () { state.repo = sel.value; state.env = null; state.pin = null; state.group = null; buildEnvs(); render(); };
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || D.repos.length < 2) return;
+    if (e.key === "[" || e.key === "]") {
+      var list = D.repos.slice().sort(function (a, b) { return a.slug.localeCompare(b.slug); }), i = list.map(function (r) { return r.slug; }).indexOf(repo().slug);
+      state.repo = list[(i + (e.key === "]" ? 1 : list.length - 1)) % list.length].slug; state.env = null; state.pin = null; state.group = null; buildRepos(); buildEnvs(); render();
+    }
+  });
+
+  /* ---------- boot ---------- */
+  if (!repo()) state.repo = D.repos[0].slug;
+  if (!env()) state.env = repo().active;
+  buildRepos(); buildEnvs(); buildRanges(); render();
+  var rt; window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(render, 100); });
+  document.addEventListener("fullscreenchange", function () { setTimeout(render, 60); });
+})();
+</script>
+</body>
+</html>

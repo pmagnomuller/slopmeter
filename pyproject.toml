@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slopmeter"
+version = "0.2.0"
+description = "Quantify AI slop in a git repository and render a dashboard"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+
+[project.scripts]
+slopmeter = "slopmeter.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["slopmeter*"]
+
+[tool.setuptools.package-data]
+slopmeter = ["*.html"]
