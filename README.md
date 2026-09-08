@@ -12,9 +12,11 @@ production (lime).*
 
 ## Origin
 
-The idea and the name come from a screenshot
-[Peter Steinberger](https://github.com/steipete) posted of his OpenClaw agent
-being told:
+I took this idea from **Peter Steinberger** ([@steipete](https://x.com/steipete)).
+On 6 September 2026 he posted
+[*"Built a slopmeter into our team server. You clearly see where we started
+pushing for more tests."*](https://x.com/steipete/status/2096443715976089814)
+together with a screenshot of the prompt he gave his OpenClaw agent:
 
 > Create a dashboard with widgets to show how prod LOC and test LOC developed
 > over time with a fancy interactive chart with a date duration selector,
@@ -27,7 +29,8 @@ and a test curve overtaking production. That looked like a genuinely useful
 lens on any repo, so this is an independent, stdlib-only re-implementation you
 can point at your own repositories: same layout and spirit, plus exact
 per-day counting, deploy environments, a multi-repo fleet view, PR linkage and
-AI-assisted commit detection.
+AI-assisted commit detection. All credit for the idea, name and design goes to
+Peter; the code here is mine.
 
 The **slop score** borrows the *attention-gap* idea from
 [slop-o-meter](https://slop-o-meter.dev): code is slop when it arrives faster
