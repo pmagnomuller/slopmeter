@@ -1033,7 +1033,8 @@
     box.classList.remove("hidden");
     var ai = prs.filter(function (p) { return p.ai; }).length;
     var h = "<div class='h'><span>Merged pull requests · <b>" + fmtD(x.d, true) + "</b>" + (isTags(env()) ? " · since previous deploy" : "") + "</span><span><b>" + prs.length + "</b> PRs" + (ai ? " · " + ai + " AI-flagged" : "") + " · <b>" + short(prs.reduce(function (a, p) { return a + p.d; }, 0)) + "</b> net lines (GitHub, all files)</span></div>";
-    if (!prs.length) h += "<div class='empty'>no pull requests merged" + (isTags(env()) ? " in this deploy" : " that day") + " (direct pushes or squash without PR)</div>";
+    var allPrDays = Object.keys(repo().prs || {}).sort(), oldest = allPrDays[0];
+    if (!prs.length) h += "<div class='empty'>" + (oldest && x.d < oldest ? "PR data covers merges since " + fmtD(oldest, true) + " (GitHub fetch limit); nothing linked before that" : "no pull requests merged" + (isTags(env()) ? " in this deploy" : " that day") + " (direct pushes or squash without PR)") + "</div>";
     prs.slice(0, 40).forEach(function (p) {
       h += "<a class='pr' href='" + esc(p.u) + "' target='_blank' rel='noopener'><span class='n'>#" + p.n + "</span><span class='t'>" + esc(p.t) + (p.ai ? " <span class='badge ai'>AI</span>" : "") + "</span><span class='a'>" + esc(p.a) + "</span><span class='d" + (p.d > 0 ? " pos" : "") + "'>" + short(p.d) + "</span></a>";
     });

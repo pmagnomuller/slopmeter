@@ -28,6 +28,15 @@ def test_ignored_even_under_tests():
     assert classify_file("node_modules/x/index.js") == "ignored"
 
 
+def test_dotfiles_assets_and_code_filenames():
+    assert classify_file(".gitignore") == "ignored"
+    assert classify_file("app/.python-version") == "ignored"
+    assert classify_file("docs/img/logo.png") == "ignored"
+    assert classify_file("CITATION.cff") == "ignored"
+    assert classify_file("Makefile") == "prod"
+    assert classify_file("docker/Dockerfile.api") == "prod"
+
+
 def test_generated_ignored():
     assert is_generated("api/v1/service.pb.go")
     assert is_generated("internal/mocks/mock_store.go")

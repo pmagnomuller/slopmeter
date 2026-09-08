@@ -76,9 +76,20 @@ LANGUAGE_WEIGHTS: Dict[str, float] = {
     ".bru": 0.3, ".http": 0.3, ".ipynb": 0.3, ".svg": 0.1, ".html": 0.4,
     # bdd specs are executable tests
     ".feature": 1.0,
+    # more code
+    ".ps1": 1.0, ".psm1": 1.0, ".lua": 1.0, ".r": 1.0, ".jl": 1.0, ".hs": 1.0, ".erl": 1.0, ".ml": 1.0,
+    ".nim": 1.0, ".zig": 1.0, ".m": 1.0, ".mm": 1.0, ".groovy": 1.0, ".gradle": 0.7, ".cmake": 0.7,
+    ".mjs": 1.0, ".astro": 1.0, ".hcl": 0.7, ".bicep": 0.7, ".nix": 0.7, ".dockerfile": 1.0,
 }
 
-DEFAULT_WEIGHT = 0.5
+# Unknown extensions are ignored (assets, data, dotfiles) — only real code counts.
+DEFAULT_WEIGHT = 0.3
+
+# Extension-less files that are code.
+_CODE_FILENAMES = {
+    "Makefile", "GNUmakefile", "Dockerfile", "Containerfile", "Jenkinsfile", "Rakefile", "Gemfile",
+    "Procfile", "Vagrantfile", "Justfile", "justfile", "Brewfile", "Fastfile", "Podfile", "BUILD", "WORKSPACE",
+}
 
 # Filenames (regardless of extension) that are generated/lock artifacts.
 _LOCK_FILES = {
@@ -162,7 +173,11 @@ def language_weight(path: str) -> float:
         return 0.1
     if name.endswith(_MINIFIED_SUFFIXES):
         return 0.1
-    ext = Path(path).suffix
+    if name in _CODE_FILENAMES or name.startswith("Dockerfile."):
+        return 1.0
+    ext = Path(path).suffix.lower()
+    if not ext or name.startswith("."):
+        return 0.0  # dotfiles and extension-less config never count
     return LANGUAGE_WEIGHTS.get(ext, DEFAULT_WEIGHT)
 
 

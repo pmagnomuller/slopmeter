@@ -4,6 +4,35 @@ Quantify AI slop in a git repository and render a self-contained, fullscreen
 "codebase observatory" dashboard: exact production vs. test LOC over time,
 daily movement, where the lines live, who wrote them, and a slop score.
 
+![Slopmeter dashboard for fastapi/fastapi, all-time view with a pinned day](docs/screenshot.png)
+
+*`slopmeter fastapi/fastapi` — 888 daily snapshots, a pinned day listing the
+pull requests merged that day, and the test line (violet) pulling ahead of
+production (lime).*
+
+## Origin
+
+The idea and the name come from a screenshot
+[Peter Steinberger](https://github.com/steipete) posted of his OpenClaw agent
+being told:
+
+> Create a dashboard with widgets to show how prod LOC and test LOC developed
+> over time with a fancy interactive chart with a date duration selector,
+> defaulting to last 30 days. Call it "Slopmeter" and draw a cool icon and pin
+> it and make dashboard fullscreen.
+
+The resulting page for `openclaw/openclaw` — "Every line tells a story.
+Production meets tests. Watch the balance evolve." — showed millions of lines
+and a test curve overtaking production. That looked like a genuinely useful
+lens on any repo, so this is an independent, stdlib-only re-implementation you
+can point at your own repositories: same layout and spirit, plus exact
+per-day counting, deploy environments, a multi-repo fleet view, PR linkage and
+AI-assisted commit detection.
+
+The **slop score** borrows the *attention-gap* idea from
+[slop-o-meter](https://slop-o-meter.dev): code is slop when it arrives faster
+than humans can own, review and verify it.
+
 Slop = code added faster than a human could meaningfully own, review, and
 verify it. Point it at a repo and watch the balance between production and
 test code evolve day by day.
