@@ -2,7 +2,8 @@
 
 Quantify AI slop in a git repository and render a self-contained, fullscreen
 "codebase observatory" dashboard: exact production vs. test LOC over time,
-daily movement, where the lines live, who wrote them, and a slop score.
+daily movement, where the lines live, who wrote them, an attention-gap slop
+score, and a longitudinal **waste** series (deadweight + vibe findings).
 
 ![Slopmeter dashboard for fastapi/fastapi, all-time view with a pinned day](docs/screenshot.png)
 
@@ -40,6 +41,12 @@ Slop = code added faster than a human could meaningfully own, review, and
 verify it. Point it at a repo and watch the balance between production and
 test code evolve day by day.
 
+**Waste** is the complementary lens: we do not estimate “AI probability.” We
+report observable quality problems that accumulate in the tree — swallowed
+exceptions, empty stubs, trivial asserts, empty doc sections, dense stock
+prose — as a time series next to LOC. Authorship is not the question; unused
+or formulaic surface area is. Gate PRs with `slopmeter audit`.
+
 ## Develop
 
 ```bash
@@ -64,6 +71,7 @@ slopmeter . -o report.html -w      # custom output, open in browser
 slopmeter . -d 90                  # default range 90 days (default: 30)
 slopmeter . -b prod=main -b dev=develop   # explicit env → branch mapping
 slopmeter . --group-depth 2        # finer directory breakdown
+slopmeter . --no-waste             # skip historical waste scan (faster)
 
 # several repos in one dashboard (repo switcher top-right, [ ] keys)
 slopmeter ~/dev/api ~/dev/web -o team.html
@@ -74,6 +82,12 @@ slopmeter acme/api acme/web --refresh
 
 # every non-archived, non-fork repo of an org (needs `gh` authenticated)
 slopmeter --org acme --only '^acme/(api|svc)-' -o acme.html
+
+# CI / pre-commit style waste gate (exit 1 on warning+)
+slopmeter audit .
+slopmeter audit --diff --fail-level error
+slopmeter audit --staged --format json
+slopmeter audit --commit-message .git/COMMIT_EDITMSG
 ```
 
 Remote specs accept `owner/repo`, `https://github.com/...` or `git@github.com:...`.
@@ -109,12 +123,17 @@ first for the full story (the CLI warns you).
 - **Slop score** is the attention-gap model: weighted lines added vs. the human
   attention available (commit budget + test lines written). Lower is better.
   Tunables live at the top of `slopmeter/scoring.py` and `slopmeter/gitlog.py`.
+- **Waste** reuses the same unique-blob pass: each blob is scanned with a small
+  deterministic rule set (`slopmeter/waste.py`). Per-day totals and
+  deadweight/vibe splits feed the dashboard. Density = findings per 1 000
+  production LOC. Rules stay high-signal (empty handlers, stubs, trivial
+  asserts, empty doc sections, dense stock transitions / assistant framing).
 
 ## Fleet view, PRs, AI share
 
 - With several repos the dashboard lands on a **Fleet** table (key `G`): LOC,
-  test ratio, 30/90-day deltas, slop, AI share, last activity, sparkline —
-  sortable, click a row to drill in.
+  test ratio, 30/90-day deltas, waste, waste/KLOC, slop, AI share, last activity,
+  sparkline — sortable, click a row to drill in.
 - Merged **pull requests** are fetched with `gh` (`--no-prs` to skip). Pin a day
   to list what was merged; on tag environments a deploy lists everything merged
   since the previous deploy.
@@ -135,11 +154,11 @@ tab). Layout mirrors a codebase observatory:
 - **Range**: 7 / 30 / 90 / 180 days / all time (keys `1`–`5`), free date
   pickers, and a **brush** under the main chart to drag through history.
 - **Metric**: nonblank LOC, all lines, files, bytes.
-- **KPI cards** with sparklines: production, tests, test/prod ratio, net change
-  in range.
-- **Main chart**: LOC · Δ from start · ratio modes, crosshair + tooltip,
-  **click to pin**, `←`/`→` to step days (`shift` skips quiet days), `esc` to
-  unpin, direct end labels, snapshot sha per day.
+- **KPI cards** with sparklines: production, tests, test/prod ratio, waste
+  findings, net change in range.
+- **Main chart**: LOC · Δ from start · ratio · **waste** modes, crosshair +
+  tooltip, **click to pin**, `←`/`→` to step days (`shift` skips quiet days),
+  `esc` to unpin, direct end labels, snapshot sha per day.
 - **Daily net movement**: two bars per day (weekly beyond 120 days), additions
   minus removals, with the range total.
 - **Where the lines live**: prod/test per directory (detailed or rolled up to

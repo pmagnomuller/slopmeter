@@ -469,13 +469,28 @@ class Snapshot:
     test_bytes: int = 0
     groups: Dict[str, List[int]] = field(default_factory=dict)  # group -> [prod, test, prod_files, test_files]
     langs: Dict[str, List[int]] = field(default_factory=dict)   # lang -> [prod, test]
+    # waste: observable deadweight + vibe findings across the tree that day
+    waste: int = 0           # total findings
+    waste_err: int = 0
+    waste_warn: int = 0
+    waste_info: int = 0
+    waste_dead: int = 0      # deadweight module
+    waste_vibe: int = 0      # vibecheck module
 
 
-def compute_snapshots(repo: Path, heads: List, group_depth: int = 1, progress=None) -> List[Snapshot]:
+def compute_snapshots(
+    repo: Path,
+    heads: List,
+    group_depth: int = 1,
+    progress=None,
+    waste: bool = True,
+) -> List[Snapshot]:
     """Exact per-day snapshots along *heads* ([(date, sha), ...]).
 
     Every unique blob is counted once via `git cat-file --batch`; trees are
-    listed per day. Cost is roughly O(unique blobs + days * files).
+    listed per day. Cost is roughly O(unique blobs + days * files). When
+    *waste* is true, the same unique blobs are scanned for deadweight/vibe
+    findings and aggregated onto each day's tree.
     """
     from .gitlog import blob_stats, ls_tree
 
@@ -502,10 +517,22 @@ def compute_snapshots(repo: Path, heads: List, group_depth: int = 1, progress=No
         progress(f"  counting {len(needed):,} blobs …")
     stats = blob_stats(repo, list(needed))
 
+    from .waste import WasteStats, scan_blobs
+
+    waste_by_blob = {}
+    if waste and needed:
+        # Prefer a representative path per blob from the latest tree.
+        path_for: Dict[str, str] = {}
+        for kept in trees:
+            for blob, path, _ in kept:
+                path_for[blob] = path
+        waste_by_blob = scan_blobs(repo, path_for.items(), progress=progress)
+
     group_cache: Dict[str, str] = {}
     snaps: List[Snapshot] = []
     for (date, sha), kept in zip(heads, trees):
         snap = Snapshot(date=date, sha=sha)
+        wstats = WasteStats()
         for blob, path, kind in kept:
             lines, nonblank, size = stats.get(blob, (0, 0, 0))
             g = group_cache.get(path)
@@ -521,6 +548,10 @@ def compute_snapshots(repo: Path, heads: List, group_depth: int = 1, progress=No
             else:
                 snap.prod += nonblank; snap.prod_all += lines; snap.prod_files += 1; snap.prod_bytes += size
                 gi[0] += nonblank; gi[2] += 1; li[0] += nonblank
+            wb = waste_by_blob.get(blob)
+            if wb is not None:
+                wstats.add(wb, 1)
+        snap.waste, snap.waste_err, snap.waste_warn, snap.waste_info, snap.waste_dead, snap.waste_vibe = wstats.as_tuple()
         snaps.append(snap)
     return snaps
 
