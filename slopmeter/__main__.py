@@ -157,12 +157,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("repo", nargs="*", default=[],
                    help="repositories: local paths, owner/repo, or GitHub URLs (remote ones are cloned into the cache). "
-                        "Several repos go into one dashboard with a repo switcher. Default: cwd")
+                        "Several repos go into one dashboard with a repo switcher. Default: cwd. "
+                        "Use `slopmeter audit` for a point-in-time waste gate.")
     p.add_argument("--org", default=None, help="add every non-archived, non-fork repo of a GitHub org (needs `gh`)")
     p.add_argument("--cache", default=None, help="where remote clones live (default: ~/.cache/slopmeter/repos or $SLOPMETER_CACHE)")
     p.add_argument("--refresh", action="store_true", help="git fetch cached remote clones before analyzing")
     p.add_argument("--only", action="append", default=None, help="regex filter on repo slugs (repeatable)")
     p.add_argument("--no-prs", action="store_true", help="skip fetching merged pull requests via `gh` (used for day tooltips)")
+    p.add_argument("--no-waste", action="store_true",
+                   help="skip deadweight/vibe waste scanning on historical snapshots (faster)")
     p.add_argument("-o", "--output", default=None, help="output HTML path (default: slopmeter-<repo>.html)")
     p.add_argument("-w", "--open", action="store_true", help="open the dashboard in the browser after writing")
     p.add_argument("-b", "--branch", action="append", default=None,
@@ -174,6 +177,91 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--title", default=None, help="display name for a single repo (default: origin org/repo)")
     p.add_argument("--version", action="version", version=f"%(prog)s {__import__('slopmeter').__version__}")
     return p
+
+
+def build_audit_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="slopmeter audit",
+        description="Scan working-tree files for observable waste (deadweight + vibe). Exit 1 if findings "
+                    "meet --fail-level. Complements the dashboard's longitudinal waste series.",
+    )
+    p.add_argument("paths", nargs="*", default=[], help="files or directories to scan (default: . ; with --diff/--staged: changed files)")
+    p.add_argument("--diff", action="store_true", help="scan unstaged + untracked changes vs HEAD")
+    p.add_argument("--staged", action="store_true", help="scan staged index paths only")
+    p.add_argument("--base", default=None, help="with --diff, compare against this rev...HEAD instead of working tree vs HEAD")
+    p.add_argument("--fail-level", choices=("info", "warning", "error"), default="warning",
+                   help="minimum severity that fails the gate (default: warning)")
+    p.add_argument("--format", choices=("text", "json"), default="text", dest="fmt")
+    p.add_argument("--commit-message", metavar="FILE",
+                   help="also check a commit-msg file for placeholder subjects (TRAIL001)")
+    return p
+
+
+def _changed_paths(repo: Path, base: Optional[str], staged: bool, working_diff: bool) -> List[Path]:
+    if staged:
+        proc = _git(repo, "diff", "--cached", "--name-only", "-z")
+        return [repo / n for n in proc.stdout.split("\0") if n]
+    if base:
+        proc = _git(repo, "diff", "--name-only", "-z", f"{base}...HEAD")
+        return [repo / n for n in proc.stdout.split("\0") if n]
+    if working_diff:
+        proc = _git(repo, "diff", "--name-only", "-z", "HEAD")
+        untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "-z")
+        names = [n for n in (proc.stdout + "\0" + untracked.stdout).split("\0") if n]
+        return [repo / n for n in names]
+    return []
+
+
+def audit_main(argv: Optional[list] = None) -> int:
+    from .waste import check_commit_subject, filter_by_level, format_findings, scan_paths
+
+    args = build_audit_parser().parse_args(argv)
+    root = Path(".").resolve()
+    if _is_git_repo(root):
+        repo_root = Path(_git(root, "rev-parse", "--show-toplevel").stdout.strip() or str(root))
+    else:
+        repo_root = root
+
+    if args.staged or args.diff or args.base:
+        targets = _changed_paths(repo_root, args.base, args.staged, working_diff=args.diff or bool(args.base))
+        targets = [p for p in targets if p.is_file()]
+    elif args.paths:
+        targets = []
+        for p in args.paths:
+            target = Path(p).expanduser()
+            if not target.is_absolute():
+                target = repo_root / target
+            targets.append(target)
+    else:
+        targets = [repo_root]
+
+    findings = scan_paths(repo_root, targets) if targets else []
+
+    if args.commit_message:
+        msg_path = Path(args.commit_message)
+        try:
+            subject = msg_path.read_text(encoding="utf-8").splitlines()[0] if msg_path.is_file() else ""
+        except OSError:
+            subject = ""
+        findings.extend(check_commit_subject(subject, str(msg_path)))
+
+    findings.sort(key=lambda f: (f.path, f.line, f.rule_id))
+
+    if args.fmt == "json":
+        payload = [
+            {
+                "path": f.path, "line": f.line, "rule": f.rule_id,
+                "severity": f.severity, "message": f.message,
+                "evidence": f.evidence, "observation": f.observation,
+            }
+            for f in findings
+        ]
+        print(json.dumps({"findings": payload, "count": len(findings)}, indent=2))
+    else:
+        print(format_findings(findings))
+
+    failing = filter_by_level(findings, args.fail_level)
+    return 1 if failing else 0
 
 
 def _envs_from_args(repo: Path, specs):
@@ -262,7 +350,9 @@ def analyze_repo(repo: Path, args, name: Optional[str] = None) -> Optional[Dict]
         if not heads:
             print("  no snapshots — skipped")
             continue
-        snaps = compute_snapshots(repo, heads, args.group_depth, progress=print)
+        snaps = compute_snapshots(
+            repo, heads, args.group_depth, progress=print, waste=not args.no_waste,
+        )
         commits = load_commits(repo, branch=heads[-1][1], first_parent=True)
         if spec.kind == "tags":
             moves = compute_movement_between(repo, theads, args.group_depth)
@@ -282,6 +372,8 @@ def analyze_repo(repo: Path, args, name: Optional[str] = None) -> Optional[Dict]
                     "d": s.date, "sha": s.sha[:9], "tag": tags.get(s.date), "ab": drift.get(s.date),
                     "p": s.prod, "t": s.test, "pa": s.prod_all, "ta": s.test_all,
                     "pf": s.prod_files, "tf": s.test_files, "pb": s.prod_bytes, "tb": s.test_bytes,
+                    "w": s.waste, "we": s.waste_err, "ww": s.waste_warn, "wi": s.waste_info,
+                    "wd": s.waste_dead, "wv": s.waste_vibe,
                     "g": s.groups, "l": s.langs,
                 }
                 for s in snaps
@@ -319,15 +411,21 @@ def analyze_repo(repo: Path, args, name: Optional[str] = None) -> Optional[Dict]
     for e in env_data:
         s = e["snaps"][-1]
         ratio = s["t"] / s["p"] if s["p"] else 0
+        dens = (s["w"] / (s["p"] / 1000.0)) if s["p"] else 0.0
+        waste_bit = f"  waste={s['w']:,} ({dens:.1f}/KLOC)" if not args.no_waste else ""
         print(
             f"  [{e['id']}] {e['branch']}  {len(e['snaps'])} snapshots  "
-            f"prod={s['p']:,}  test={s['t']:,}  test/prod={ratio:.2f}x  slop={e['slop']['latest'] * 100:.0f}%"
+            f"prod={s['p']:,}  test={s['t']:,}  test/prod={ratio:.2f}x  "
+            f"slop={e['slop']['latest'] * 100:.0f}%{waste_bit}"
         )
     return {"slug": slug, "name": name, "active": env_data[0]["id"], "envs": env_data, "prs": prs,
             "trunk": trunk, "url": f"https://github.com/{slug}" if "/" in slug else None}
 
 
 def main(argv: Optional[list] = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "audit":
+        return audit_main(argv[1:])
     args = build_parser().parse_args(argv)
     repos = _resolve_repos(args)
     if args.only:
