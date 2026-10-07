@@ -1,0 +1,19 @@
+# Example / dogfood: gate this repo's own PRs on waste findings.
+name: audit
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  waste:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./
+        with:
+          base: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
+          fail-level: warning
+          history: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+          paths: .

@@ -10,7 +10,8 @@ Status of every point raised in the September 2026 review. ✅ done · 🟡 part
 | 2 | **"What happened that day"** — link days to merged PRs | ✅ | `gh pr list --state merged` per repo (disable with `--no-prs`). Tooltip shows PR count; pinning a day lists PRs (title, author, ±lines, link). Tag envs list every PR merged since the previous deploy. |
 | 3 | **AI / bot detection beyond author name** | ✅ | Commit bodies parsed: `Co-Authored-By: Claude/Codex/Copilot/…`, `Generated with Claude Code`, 🤖 markers. `is_bot` (machine author) vs `is_ai` (bot or AI-assisted human). AI-assisted human commits earn half the attention budget in the slop score. Surfaced as AI % of commits/lines in hero, "Who wrote it", fleet. |
 | 4 | **Slop score noise on tiny repos** | ✅ | `confident` flag: needs ≥ 4 active weeks and ≥ 3 000 weighted lines; otherwise UI shows `n/a · insufficient history`. Thresholds in `scoring.py`. |
-| 14 | **Longitudinal waste (vs point-in-time linters)** | ✅ | Deterministic deadweight + vibe scan on unique blobs (`waste.py`); per-snapshot counts in payload; dashboard waste KPI / chart mode / fleet columns; `slopmeter audit` CI gate (`--diff` / `--staged` / `--commit-message`). `--no-waste` skips history scan. |
+| 14 | **Longitudinal waste (vs point-in-time linters)** | ✅ | Deterministic deadweight + vibe scan on unique blobs (`waste.py`); per-snapshot counts in payload; dashboard waste KPI / chart mode / fleet columns; `slopmeter audit` CI gate (`--diff` / `--staged` / `--base` / `--history` / `--commit-message`). `--no-waste` skips history scan. |
+| 15 | **Full slopcop-aligned rule catalog + Action** | ✅ | `DEAD001`–`018`, `TRAIL001`–`002`, `VIBE001`–`026`; `slopmeter rules`; composite `action.yml` + dogfood workflow; `docs/audit.md` for local/CI use. |
 
 ## Correctness
 

@@ -84,11 +84,28 @@ slopmeter acme/api acme/web --refresh
 slopmeter --org acme --only '^acme/(api|svc)-' -o acme.html
 
 # CI / pre-commit style waste gate (exit 1 on warning+)
+# Full rule catalog: DEAD001–018, TRAIL001–002, VIBE001–026 — see docs/audit.md
+slopmeter rules
 slopmeter audit .
 slopmeter audit --diff --fail-level error
 slopmeter audit --staged --format json
-slopmeter audit --commit-message .git/COMMIT_EDITMSG
+slopmeter audit --base origin/main --history --format github
+slopmeter audit --commit-message .git/COMMIT_EDITMSG --allow-autosquash
 ```
+
+### GitHub Action (PR gate)
+
+```yaml
+- uses: actions/checkout@v4
+  with: { fetch-depth: 0 }
+- uses: pmagnomuller/slopmeter@main   # pin a tag/SHA in production
+  with:
+    base: ${{ github.base_ref }}
+    fail-level: warning
+    history: true
+```
+
+Details and company rollout notes: [docs/audit.md](docs/audit.md).
 
 Remote specs accept `owner/repo`, `https://github.com/...` or `git@github.com:...`.
 Set `SLOPMETER_CACHE` or `--cache` to move the clone cache.
@@ -123,11 +140,11 @@ first for the full story (the CLI warns you).
 - **Slop score** is the attention-gap model: weighted lines added vs. the human
   attention available (commit budget + test lines written). Lower is better.
   Tunables live at the top of `slopmeter/scoring.py` and `slopmeter/gitlog.py`.
-- **Waste** reuses the same unique-blob pass: each blob is scanned with a small
-  deterministic rule set (`slopmeter/waste.py`). Per-day totals and
-  deadweight/vibe splits feed the dashboard. Density = findings per 1 000
-  production LOC. Rules stay high-signal (empty handlers, stubs, trivial
-  asserts, empty doc sections, dense stock transitions / assistant framing).
+- **Waste** reuses the same unique-blob pass: each blob is scanned with the
+  slopcop-aligned rule set in `slopmeter/waste.py` (`DEAD001`–`018`,
+  `TRAIL001`–`002`, `VIBE001`–`026`). Per-day totals feed the dashboard;
+  density = findings per 1 000 production LOC. Gate PRs with `slopmeter audit`
+  or the bundled GitHub Action.
 
 ## Fleet view, PRs, AI share
 

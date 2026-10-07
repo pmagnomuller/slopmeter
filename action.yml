@@ -1,0 +1,87 @@
+name: slopmeter-audit
+description: Gate PRs on observable waste (deadweight + vibe + papertrail) — slopcop-style, offline, no models
+author: pmagnomuller
+branding:
+  icon: shield
+  color: yellow
+
+inputs:
+  base:
+    description: Git ref to diff against (BASE...HEAD). Empty = scan whole tree.
+    required: false
+    default: ""
+  fail-level:
+    description: Minimum severity that fails the job (info | warning | error)
+    required: false
+    default: warning
+  paths:
+    description: Optional space-separated paths to scan when base is empty
+    required: false
+    default: "."
+  history:
+    description: Also check commit subjects in base...HEAD (TRAIL001/TRAIL002)
+    required: false
+    default: "true"
+  version:
+    description: pip install ref (git tag, branch, or commit). Default uses the Action's own SHA.
+    required: false
+    default: ""
+  python-version:
+    description: Python version for setup-python
+    required: false
+    default: "3.12"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install slopmeter
+      shell: bash
+      run: |
+        set -euo pipefail
+        REF="${{ inputs.version }}"
+        if [ -z "$REF" ]; then
+          REF="${{ github.action_sha }}"
+        fi
+        # Prefer the checked-out Action workspace when it already contains slopmeter
+        if [ -f "${{ github.action_path }}/pyproject.toml" ]; then
+          pip install -e "${{ github.action_path }}"
+        else
+          pip install "git+https://github.com/pmagnomuller/slopmeter.git@${REF}"
+        fi
+        slopmeter --version
+
+    - name: Audit waste
+      shell: bash
+      run: |
+        set -euo pipefail
+        BASE="${{ inputs.base }}"
+        FAIL="${{ inputs.fail-level }}"
+        HISTORY="${{ inputs.history }}"
+        PATHS="${{ inputs.paths }}"
+
+        ARGS=(audit --fail-level "$FAIL" --format github)
+
+        if [ -n "$BASE" ]; then
+          # Resolve PR base when caller passes github.base_ref / github.event.pull_request.base.sha
+          if ! git rev-parse --verify "$BASE" >/dev/null 2>&1; then
+            git fetch --no-tags --depth=1 origin "$BASE" 2>/dev/null || true
+            if git rev-parse --verify "origin/$BASE" >/dev/null 2>&1; then
+              BASE="origin/$BASE"
+            fi
+          fi
+          ARGS+=(--base "$BASE")
+          if [ "$HISTORY" = "true" ]; then
+            ARGS+=(--history)
+          fi
+        else
+          # shellcheck disable=SC2206
+          ARGS+=($PATHS)
+        fi
+
+        echo "+ slopmeter ${ARGS[*]}"
+        slopmeter "${ARGS[@]}"

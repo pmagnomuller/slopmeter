@@ -17,7 +17,7 @@ import sys
 import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .gitlog import EnvSpec, ahead_behind, daily_heads, detect_envs, load_commits, tag_heads, trunk_branch
 from .render import render_html
@@ -123,15 +123,12 @@ def _resolve_repos(args) -> List[Path]:
 
 
 def _remote_slug(repo: Path) -> Optional[str]:
-    try:
-        proc = subprocess.run(
-            ["git", "-C", str(repo), "remote", "get-url", "origin"],
-            capture_output=True, text=True,
-        )
-        url = proc.stdout.strip()
-    except Exception:
-        return None
-    if not url:
+    proc = subprocess.run(
+        ["git", "-C", str(repo), "remote", "get-url", "origin"],
+        capture_output=True, text=True,
+    )
+    url = proc.stdout.strip()
+    if proc.returncode != 0 or not url:
         return None
     url = url.rstrip("/")
     if url.endswith(".git"):
@@ -182,18 +179,25 @@ def build_parser() -> argparse.ArgumentParser:
 def build_audit_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="slopmeter audit",
-        description="Scan working-tree files for observable waste (deadweight + vibe). Exit 1 if findings "
-                    "meet --fail-level. Complements the dashboard's longitudinal waste series.",
+        description="Scan working-tree files for observable waste (deadweight + vibe + papertrail). "
+                    "Exit 1 if findings meet --fail-level. Complements the dashboard's longitudinal waste series.",
     )
-    p.add_argument("paths", nargs="*", default=[], help="files or directories to scan (default: . ; with --diff/--staged: changed files)")
+    p.add_argument("paths", nargs="*", default=[],
+                   help="files or directories to scan (default: . ; with --diff/--staged/--base: changed files)")
     p.add_argument("--diff", action="store_true", help="scan unstaged + untracked changes vs HEAD")
     p.add_argument("--staged", action="store_true", help="scan staged index paths only")
-    p.add_argument("--base", default=None, help="with --diff, compare against this rev...HEAD instead of working tree vs HEAD")
+    p.add_argument("--base", default=None,
+                   help="scan files changed in BASE...HEAD (PR-style). Also used with --history")
+    p.add_argument("--history", action="store_true",
+                   help="also check commit subjects in BASE...HEAD for TRAIL001/TRAIL002 (requires --base)")
     p.add_argument("--fail-level", choices=("info", "warning", "error"), default="warning",
                    help="minimum severity that fails the gate (default: warning)")
-    p.add_argument("--format", choices=("text", "json"), default="text", dest="fmt")
+    p.add_argument("--format", choices=("text", "json", "github"), default="text", dest="fmt",
+                   help="text (default), json, or github (workflow annotations)")
     p.add_argument("--commit-message", metavar="FILE",
-                   help="also check a commit-msg file for placeholder subjects (TRAIL001)")
+                   help="also check a commit-msg file (TRAIL001; TRAIL002 unless --allow-autosquash)")
+    p.add_argument("--allow-autosquash", action="store_true",
+                   help="with --commit-message, allow fixup!/squash!/amend! subjects (local series prep)")
     return p
 
 
@@ -212,8 +216,26 @@ def _changed_paths(repo: Path, base: Optional[str], staged: bool, working_diff: 
     return []
 
 
+def _commit_subjects(repo: Path, base: str) -> List[Tuple[str, str]]:
+    proc = _git(repo, "log", "--format=%H%x00%s", f"{base}...HEAD")
+    out = []
+    for chunk in proc.stdout.split("\n"):
+        if not chunk or "\0" not in chunk:
+            continue
+        sha, subject = chunk.split("\0", 1)
+        out.append((sha, subject))
+    return out
+
+
 def audit_main(argv: Optional[list] = None) -> int:
-    from .waste import check_commit_subject, filter_by_level, format_findings, scan_paths
+    from .waste import (
+        check_commit_history,
+        check_commit_subject,
+        filter_by_level,
+        format_findings,
+        format_github_annotations,
+        scan_paths,
+    )
 
     args = build_audit_parser().parse_args(argv)
     root = Path(".").resolve()
@@ -221,6 +243,10 @@ def audit_main(argv: Optional[list] = None) -> int:
         repo_root = Path(_git(root, "rev-parse", "--show-toplevel").stdout.strip() or str(root))
     else:
         repo_root = root
+
+    if args.history and not args.base:
+        print("error: --history requires --base", file=sys.stderr)
+        return 2
 
     if args.staged or args.diff or args.base:
         targets = _changed_paths(repo_root, args.base, args.staged, working_diff=args.diff or bool(args.base))
@@ -243,7 +269,12 @@ def audit_main(argv: Optional[list] = None) -> int:
             subject = msg_path.read_text(encoding="utf-8").splitlines()[0] if msg_path.is_file() else ""
         except OSError:
             subject = ""
-        findings.extend(check_commit_subject(subject, str(msg_path)))
+        findings.extend(
+            check_commit_subject(subject, str(msg_path), allow_autosquash=args.allow_autosquash)
+        )
+
+    if args.history and args.base:
+        findings.extend(check_commit_history(_commit_subjects(repo_root, args.base)))
 
     findings.sort(key=lambda f: (f.path, f.line, f.rule_id))
 
@@ -257,11 +288,27 @@ def audit_main(argv: Optional[list] = None) -> int:
             for f in findings
         ]
         print(json.dumps({"findings": payload, "count": len(findings)}, indent=2))
+    elif args.fmt == "github":
+        print(format_findings(findings))
+        ann = format_github_annotations(findings)
+        if ann:
+            print(ann)
     else:
         print(format_findings(findings))
 
     failing = filter_by_level(findings, args.fail_level)
     return 1 if failing else 0
+
+
+def rules_main(argv: Optional[list] = None) -> int:
+    from .waste import list_rules
+
+    parser = argparse.ArgumentParser(prog="slopmeter rules", description="List waste rule IDs")
+    parser.parse_args(argv)
+    print(f"{'ID':<10} {'sev':<8} {'module':<12} message")
+    for r in list_rules():
+        print(f"{r.id:<10} {r.severity:<8} {r.module:<12} {r.message}")
+    return 0
 
 
 def _envs_from_args(repo: Path, specs):
@@ -426,6 +473,8 @@ def main(argv: Optional[list] = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "audit":
         return audit_main(argv[1:])
+    if argv and argv[0] == "rules":
+        return rules_main(argv[1:])
     args = build_parser().parse_args(argv)
     repos = _resolve_repos(args)
     if args.only:
