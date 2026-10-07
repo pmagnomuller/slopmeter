@@ -43,9 +43,14 @@ test code evolve day by day.
 
 **Waste** is the complementary lens: we do not estimate “AI probability.” We
 report observable quality problems that accumulate in the tree — swallowed
-exceptions, empty stubs, trivial asserts, empty doc sections, dense stock
+exceptions, empty stubs, leftover debuggers, empty doc sections, dense stock
 prose — as a time series next to LOC. Authorship is not the question; unused
 or formulaic surface area is. Gate PRs with `slopmeter audit`.
+
+The scanner is built to be **high-signal**. It skips generated files, agent
+worktrees, and outline headings that only introduce a subtitle. Broad
+`except Exception: pass` fails; `except ImportError: pass` does not.
+`assert True` fails; `assert 1 in ids` does not. See [docs/audit.md](docs/audit.md).
 
 ## Develop
 
@@ -83,8 +88,8 @@ slopmeter acme/api acme/web --refresh
 # every non-archived, non-fork repo of an org (needs `gh` authenticated)
 slopmeter --org acme --only '^acme/(api|svc)-' -o acme.html
 
-# CI / pre-commit style waste gate (exit 1 on warning+)
-# Full rule catalog: DEAD001–018, TRAIL001–002, VIBE001–026 — see docs/audit.md
+# CI / pre-commit style waste gate
+# Full catalog: DEAD001–022, TRAIL001–002, VIBE001–026 — docs/audit.md
 slopmeter rules
 slopmeter audit .
 slopmeter audit --diff --fail-level error
@@ -92,6 +97,17 @@ slopmeter audit --staged --format json
 slopmeter audit --base origin/main --history --format github
 slopmeter audit --commit-message .git/COMMIT_EDITMSG --allow-autosquash
 ```
+
+On a company PR, prefer **diff + error**:
+
+```bash
+slopmeter audit --base origin/main --fail-level error --format github
+```
+
+That fails only on things you would actually fix: swallowed `Exception`,
+bare `except:`, leftover `breakpoint()` / `debugger;`, empty `if err != nil {}`,
+unimplemented TODO stubs, placeholder commit subjects. Warnings (TODO markers,
+vibe density, decorative Phase banners) stay visible but do not block.
 
 ### GitHub Action (PR gate)
 
@@ -141,10 +157,11 @@ first for the full story (the CLI warns you).
   attention available (commit budget + test lines written). Lower is better.
   Tunables live at the top of `slopmeter/scoring.py` and `slopmeter/gitlog.py`.
 - **Waste** reuses the same unique-blob pass: each blob is scanned with the
-  slopcop-aligned rule set in `slopmeter/waste.py` (`DEAD001`–`018`,
+  slopcop-aligned rule set in `slopmeter/waste.py` (`DEAD001`–`022`,
   `TRAIL001`–`002`, `VIBE001`–`026`). Per-day totals feed the dashboard;
   density = findings per 1 000 production LOC. Gate PRs with `slopmeter audit`
-  or the bundled GitHub Action.
+  or the bundled GitHub Action. Generated swagger/`docs.go`, `.claude` dumps,
+  and parent markdown headings that only introduce a `###` subtitle are skipped.
 
 ## Fleet view, PRs, AI share
 

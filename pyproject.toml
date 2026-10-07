@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "slopmeter"
-version = "0.4.0"
+version = "0.5.0"
 description = "Codebase observatory: LOC, attention-gap slop, and longitudinal waste findings"
 readme = "README.md"
 requires-python = ">=3.9"
